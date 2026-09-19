@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+python-dotenv
+httpx
+authlib
+sqlalchemy
+pydantic
+python-multipart
+itsdangerous
+numpy
+scikit-learn
+sentence-transformers
+hdbscan
+scipy
+umap-learn

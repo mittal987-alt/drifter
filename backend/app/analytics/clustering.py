@@ -1,0 +1,36 @@
+import numpy as np
+import hdbscan
+
+
+def cluster_embeddings(
+    embeddings: np.ndarray,
+    min_cluster_size: int = 5,
+) -> np.ndarray:
+    """
+    Cluster semantic embeddings using HDBSCAN.
+
+    Cluster label -1 means noise / unassigned.
+    """
+
+    if len(embeddings) == 0:
+        return np.array([], dtype=int)
+
+    if len(embeddings) < min_cluster_size:
+        return np.full(
+            len(embeddings),
+            -1,
+            dtype=int,
+        )
+
+    clusterer = hdbscan.HDBSCAN(
+        min_cluster_size=min_cluster_size,
+        metric="euclidean",
+        cluster_selection_method="eom",
+        prediction_data=False,
+    )
+
+    labels = clusterer.fit_predict(
+        embeddings
+    )
+
+    return labels.astype(int)
