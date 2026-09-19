@@ -27,6 +27,7 @@ from app.services.youtube_history_service import (
 from app.services.history_service import parse_history_file
 from app.services.analysis_cache_service import delete_cached_analysis
 from app.services.analysis_runner import run_user_analysis
+from app.analytics.topics import classify_single_event
 
 
 # =============================================================
@@ -390,6 +391,7 @@ def get_history_events(
                 "source": event.source,
                 "title": event.title,
                 "artist": event.artist,
+                "topic": classify_single_event(event.title, event.artist),
                 "url": event.url,
                 "duration": event.duration,
                 "metadata": (

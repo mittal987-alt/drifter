@@ -12,6 +12,7 @@ from app.api.youtube import router as youtube_router
 from app.api.history import router as history_router
 from app.api.analytics import router as analytics_router
 from app.api.google_history import router as google_history_router
+from app.api.history_extension_api import router as history_extension_router
 
 # Database
 from sqlalchemy import inspect, text
@@ -165,6 +166,7 @@ app.include_router(
 )
 
 app.include_router(google_history_router)
+app.include_router(history_extension_router)
 
 
 # ============================================================

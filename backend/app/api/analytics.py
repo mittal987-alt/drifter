@@ -207,13 +207,16 @@ def get_dashboard(
         )
 
         if cached:
-
             analysis = cached["analysis"]
-
-            return build_dashboard_response(
-                analysis,
-                cached=True,
-            )
+            assignments = analysis.get("assignments", [])
+            # If all assignments are labeled "Other", bypass cache to re-analyze with categorization
+            if assignments and all(a.get("topic") == "Other" for a in assignments if isinstance(a, dict)):
+                cached = None
+            else:
+                return build_dashboard_response(
+                    analysis,
+                    cached=True,
+                )
 
     # ========================================================
     # LOAD EVENTS

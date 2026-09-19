@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Drifter — YouTube Sync</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    body {
+      width: 320px;
+      background: #09090b;
+      color: #f4f4f5;
+      padding: 16px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 12px;
+    }
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #8b5cf6, #06b6d4);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 14px;
+      color: #fff;
+      box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
+    }
+    .header h1 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.2px;
+    }
+    .header p {
+      font-size: 11px;
+      color: #a1a1aa;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 14px;
+    }
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .status-label {
+      font-size: 12px;
+      color: #a1a1aa;
+    }
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 99px;
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #a1a1aa;
+    }
+    .dot.success { background: #10b981; box-shadow: 0 0 6px #10b981; }
+    .dot.failed { background: #f43f5e; box-shadow: 0 0 6px #f43f5e; }
+    .dot.idle { background: #f59e0b; }
+
+    .form-group {
+      margin-bottom: 10px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: #a1a1aa;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .form-group input {
+      width: 100%;
+      background: #18181b;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: #fff;
+      font-size: 12px;
+      outline: none;
+    }
+    .form-group input:focus {
+      border-color: #8b5cf6;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    button {
+      flex: 1;
+      padding: 9px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+      color: #fff;
+    }
+    .btn-primary:hover {
+      opacity: 0.9;
+    }
+    .btn-secondary {
+      background: #27272a;
+      color: #e4e4e7;
+    }
+    .btn-secondary:hover {
+      background: #3f3f46;
+    }
+    .message {
+      font-size: 11px;
+      margin-top: 10px;
+      text-align: center;
+      min-height: 16px;
+    }
+    .message.error { color: #f43f5e; }
+    .message.success { color: #10b981; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-icon">D</div>
+    <div>
+      <h1>Drifter Sync</h1>
+      <p>Real-time YouTube Watch Tracker</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="status-row">
+      <span class="status-label">Queued Events</span>
+      <span className="status-badge" id="queueBadge">0 items</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Last Sync</span>
+      <div class="status-badge">
+        <span class="dot idle" id="statusDot"></span>
+        <span id="statusText">Idle</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label for="backendUrl">Backend API URL</label>
+    <input type="text" id="backendUrl" placeholder="http://127.0.0.1:8000" />
+  </div>
+
+  <div class="form-group">
+    <label for="syncToken">Extension Sync Token</label>
+    <input type="password" id="syncToken" placeholder="Paste token from Drifter app..." />
+  </div>
+
+  <div class="btn-group">
+    <button class="btn-secondary" id="saveBtn">Save Settings</button>
+    <button class="btn-primary" id="syncBtn">Sync Now</button>
+  </div>
+
+  <div class="message" id="messageBox"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

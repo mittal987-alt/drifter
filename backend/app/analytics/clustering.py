@@ -15,7 +15,10 @@ def cluster_embeddings(
     if len(embeddings) == 0:
         return np.array([], dtype=int)
 
-    if len(embeddings) < min_cluster_size:
+    # Adaptively adjust min_cluster_size for smaller datasets so HDBSCAN can form clusters
+    effective_min_size = min(min_cluster_size, max(2, len(embeddings) // 4))
+
+    if len(embeddings) < effective_min_size:
         return np.full(
             len(embeddings),
             -1,
@@ -23,7 +26,7 @@ def cluster_embeddings(
         )
 
     clusterer = hdbscan.HDBSCAN(
-        min_cluster_size=min_cluster_size,
+        min_cluster_size=effective_min_size,
         metric="euclidean",
         cluster_selection_method="eom",
         prediction_data=False,
@@ -33,4 +36,4 @@ def cluster_embeddings(
         embeddings
     )
 
-    return labels.astype(int)
+    return labels.astype(int)

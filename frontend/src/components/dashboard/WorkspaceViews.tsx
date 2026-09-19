@@ -23,7 +23,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 
@@ -207,7 +207,11 @@ export function OverviewView({ dashboard, onOpenView, onRefresh }: WorkspaceProp
 
       <div className="mt-6 space-y-6">
         <TopicDistribution topics={dashboard.top_topics} />
-        <InterestMomentum rising={dashboard.evolution.rising} fading={dashboard.evolution.fading} />
+        <InterestMomentum
+          rising={dashboard.evolution.rising}
+          fading={dashboard.evolution.fading}
+          assignments={dashboard.assignments}
+        />
       </div>
     </>
   );
@@ -263,12 +267,117 @@ export function BehaviorView({ dashboard, onOpenView }: WorkspaceProps) {
 
 export function HistoryView({ dashboard, history, historyLoading }: WorkspaceProps) {
   const [query, setQuery] = useState("");
-  const filtered = history.filter((event) => `${event.title} ${event.artist || ""} ${event.source}`.toLowerCase().includes(query.toLowerCase()));
+
+  const topicMap = useMemo(() => {
+    const map = new Map<number | string, string>();
+    (dashboard?.assignments || []).forEach((a) => {
+      if (a.event_id && a.topic && a.topic !== "Other" && a.topic !== "Unassigned") {
+        map.set(a.event_id, a.topic);
+      }
+    });
+    return map;
+  }, [dashboard?.assignments]);
+
+  const historyWithTopics = useMemo(() => {
+    return history.map((event) => {
+      const topic = topicMap.get(event.id) || (event.topic && event.topic !== "Unassigned" ? event.topic : "General Exploration");
+      return { ...event, resolvedTopic: topic };
+    });
+  }, [history, topicMap]);
+
+  const filtered = useMemo(() => {
+    return historyWithTopics.filter((event) =>
+      `${event.title} ${event.artist || ""} ${event.source} ${event.resolvedTopic}`
+        .toLowerCase()
+        .includes(query.toLowerCase())
+    );
+  }, [historyWithTopics, query]);
+
   return (
     <>
-      <ViewIntro eyebrow="Raw signal / history" title="Every trace behind the map." description="Search the events that shaped your analysis, then follow them back to their source." />
-      <Panel><div className="history-toolbar"><div className="search-box"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles, artists, sources..." /></div><span className="history-count">{filtered.length} events</span></div><div className="history-table"><div className="history-table-head"><span>Event</span><span>Topic</span><span>Source</span><span>Date</span></div>{historyLoading ? <Empty message="Loading history..." /> : filtered.map((event) => <div className="history-row" key={event.id}><div><strong>{event.title}</strong><span>{event.artist || "Untitled activity"}</span></div><span className="topic-pill">{event.topic || "Unassigned"}</span><span className="source-label">{event.source}</span><time>{new Date(event.timestamp).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</time>{event.url && <a href={event.url} target="_blank" rel="noreferrer" title="Open source"><ExternalLink size={14} /></a>}</div>)}{!historyLoading && !filtered.length && <Empty message="No matching events." />}</div></Panel>
-      <p className="workspace-footnote">Showing the latest {dashboard.assignments.length.toLocaleString()} analyzed assignments. Imported history remains deduplicated in the backend.</p>
+      <ViewIntro
+        eyebrow="Raw signal / history"
+        title="Every trace behind the map."
+        description="Search the events that shaped your analysis, then follow them back to their source."
+      />
+      <Panel>
+        <div className="history-toolbar">
+          <div className="search-box">
+            <Search size={15} />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search titles, artists, topics, sources..."
+            />
+          </div>
+          <span className="history-count">{filtered.length} events</span>
+        </div>
+
+        <div className="history-table">
+          <div className="history-table-head">
+            <span>Event</span>
+            <span>Topic</span>
+            <span>Source</span>
+            <span>Date</span>
+          </div>
+
+          {historyLoading ? (
+            <Empty message="Loading history..." />
+          ) : (
+            filtered.map((event) => {
+              const color = topicColor(event.resolvedTopic);
+              return (
+                <div className="history-row" key={event.id}>
+                  <div>
+                    <strong>{event.title}</strong>
+                    <span>{event.artist || "Untitled activity"}</span>
+                  </div>
+
+                  <span
+                    className="topic-pill"
+                    style={{
+                      color: color,
+                      backgroundColor: `${color}1A`,
+                      borderColor: `${color}33`,
+                    }}
+                  >
+                    {event.resolvedTopic}
+                  </span>
+
+                  <span className="source-label capitalize">{event.source}</span>
+
+                  <time>
+                    {new Date(event.timestamp).toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </time>
+
+                  {event.url && (
+                    <a
+                      href={event.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Open source"
+                    >
+                      <ExternalLink size={14} />
+                    </a>
+                  )}
+                </div>
+              );
+            })
+          )}
+
+          {!historyLoading && !filtered.length && (
+            <Empty message="No matching events." />
+          )}
+        </div>
+      </Panel>
+
+      <p className="workspace-footnote">
+        Showing {historyWithTopics.length.toLocaleString()} history events categorized across your analyzed topics.
+      </p>
     </>
   );
 }

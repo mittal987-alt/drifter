@@ -13,6 +13,7 @@ from app.analytics.clustering import (
 
 from app.analytics.topics import (
     generate_topic_labels,
+    classify_single_event,
 )
 
 from app.analytics.time_analysis import (
@@ -255,8 +256,13 @@ def run_analysis_pipeline(
         prepared_events,
         assignments,
     ):
-
         cluster_id = int(cluster_id)
+
+        topic = topic_labels.get(cluster_id, "Other")
+        if cluster_id == -1 or topic == "Other":
+            fallback = classify_single_event(event["title"], event.get("artist"))
+            if fallback:
+                topic = fallback
 
         assignment_rows.append(
             {
@@ -267,10 +273,7 @@ def run_analysis_pipeline(
                 "artist": event["artist"],
                 "url": event["url"],
                 "cluster": cluster_id,
-                "topic": topic_labels.get(
-                    cluster_id,
-                    "Other",
-                ),
+                "topic": topic,
             }
         )
 
@@ -292,21 +295,17 @@ def run_analysis_pipeline(
         np.sum(assignments == -1)
     )
 
+    topic_counts: dict[str, int] = {}
+    for row in assignment_rows:
+        t_name = row["topic"]
+        topic_counts[t_name] = topic_counts.get(t_name, 0) + 1
+
     topics = {}
-
-    for cluster_id in cluster_ids:
-
-        topics[str(cluster_id)] = {
-            "id": cluster_id,
-            "label": topic_labels.get(
-                cluster_id,
-                "Other",
-            ),
-            "event_count": int(
-                np.sum(
-                    assignments == cluster_id
-                )
-            ),
+    for idx, (t_name, count) in enumerate(topic_counts.items()):
+        topics[str(idx)] = {
+            "id": idx,
+            "label": t_name,
+            "event_count": count,
         }
 
     # =========================================================

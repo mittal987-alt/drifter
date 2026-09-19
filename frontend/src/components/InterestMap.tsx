@@ -63,32 +63,34 @@ function InterestTooltip({
   }
 
   const point = payload[0].payload as InterestPoint;
+  const title = String(point.title ?? "Untitled activity");
+  const artist = point.artist == null ? null : String(point.artist);
+  const topic = String(point.topic ?? "Unknown");
+  const source = String(point.source ?? "Unknown source");
 
   return (
     <div className="interest-tooltip">
 
       <strong>
-        {point.title}
+        {title}
       </strong>
 
-      {point.artist && (
+      {artist && (
         <span>
-          {point.artist}
+          {artist}
         </span>
       )}
 
       <span>
-        {point.topic}
+        {topic}
       </span>
 
       <span>
-        {point.source}
+        {source}
       </span>
 
       <small>
-        {new Date(
-          point.timestamp
-        ).toLocaleDateString()}
+        {new Date(String(point.timestamp)).toLocaleDateString()}
       </small>
 
     </div>
@@ -218,7 +220,7 @@ export default function InterestMap({
               <span className="legend-dot" />
 
               <span>
-                {topic}
+                {String(topic)}
               </span>
 
             </div>
