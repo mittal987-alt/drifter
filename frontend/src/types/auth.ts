@@ -6,10 +6,14 @@ export interface AuthConnection {
 
 export interface AuthUser {
   id: number;
+  email?: string | null;
+  name?: string | null;
 }
 
 export interface AuthResponse {
   authenticated: boolean;
   user?: AuthUser;
   connections?: AuthConnection[];
+  sync_token?: string;
+  message?: string;
 }

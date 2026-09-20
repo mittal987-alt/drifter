@@ -70,8 +70,8 @@ def get_current_user_id(
             if user:
                 return int(user.id)
 
-        # Create or fetch first user if not found
-        guest_user = db.query(User).first()
+        # Create or fetch first user if not found — always use the primary (lowest id) user
+        guest_user = db.query(User).order_by(User.id.asc()).first()
         if not guest_user:
             guest_user = User()
             db.add(guest_user)

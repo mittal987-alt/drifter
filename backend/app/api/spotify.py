@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 
 from app.api.dependencies import get_current_user_id
 from app.database.database import SessionLocal
@@ -9,7 +9,9 @@ from app.database.models import Connection
 from app.services.spotify_service import (
     spotify_api_request,
     refresh_spotify_token,
+    sync_spotify_user_history,
 )
+from app.services.analysis_runner import run_user_analysis
 
 
 router = APIRouter()
@@ -167,3 +169,40 @@ async def spotify_top(
             "limit": limit,
         },
     )
+
+
+# ============================================================
+# SYNC SPOTIFY TRACKS TO HISTORY
+# ============================================================
+
+@router.post("/sync")
+async def sync_spotify(
+    background_tasks: BackgroundTasks,
+    user_id: int = Depends(get_current_user_id),
+    access_token: str = Depends(get_spotify_access_token),
+):
+    """
+    Sync user's Spotify listening history (recent and top tracks) into history_events
+    and kick off asynchronous topic and drift analysis.
+    """
+    db = SessionLocal()
+    try:
+        result = await sync_spotify_user_history(
+            db=db,
+            user_id=user_id,
+            access_token=access_token,
+        )
+
+        # Trigger background analysis runner for Spotify source and unified view
+        background_tasks.add_task(run_user_analysis, user_id=user_id, source="spotify")
+        background_tasks.add_task(run_user_analysis, user_id=user_id, source=None)
+
+        return {
+            "status": "success",
+            "message": f"Successfully synced {result['imported']} tracks ({result['duplicates']} duplicates skipped).",
+            "imported": result["imported"],
+            "duplicates": result["duplicates"],
+            "total": result.get("total", 0),
+        }
+    finally:
+        db.close()

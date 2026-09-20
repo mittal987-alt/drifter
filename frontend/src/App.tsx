@@ -28,6 +28,9 @@ import {
   Compass,
   Dna,
   Shuffle,
+  Puzzle,
+  Music,
+  Key,
 } from "lucide-react";
 
 import {
@@ -49,6 +52,7 @@ import {
   getLatestGoogleExportStatus,
 } from "./services/history";
 import type { HistoryEvent } from "./services/history";
+import { syncSpotifyHistory } from "./services/spotify";
 
 import InterestMap from "./components/InterestMap";
 
@@ -65,6 +69,8 @@ import {
 } from "./components/dashboard/WorkspaceViews";
 import HistoryChatModal from "./components/chat/HistoryChatModal";
 import YearInDriftModal from "./components/reports/YearInDriftModal";
+import ExtensionSyncModal from "./components/ExtensionSyncModal";
+import AccountTokenModal from "./components/auth/AccountTokenModal";
 
 /*
 |--------------------------------------------------------------------------
@@ -94,6 +100,7 @@ import { TextGenerateEffect } from "@/components/ui/text-generate-effect";
 
 function App() {
   const {
+    auth,
     loading: authLoading,
     authenticated,
     isConnected,
@@ -173,6 +180,12 @@ function App() {
   const [wrappedOpen, setWrappedOpen] =
     useState(false);
 
+  const [extensionModalOpen, setExtensionModalOpen] =
+    useState(false);
+
+  const [accountModalOpen, setAccountModalOpen] =
+    useState(false);
+
   const [history, setHistory] =
     useState<HistoryEvent[]>([]);
 
@@ -180,6 +193,12 @@ function App() {
     useState(false);
 
   const [googleExportStatus, setGoogleExportStatus] =
+    useState<string | null>(null);
+
+  const [spotifySyncing, setSpotifySyncing] =
+    useState(false);
+
+  const [spotifySyncToast, setSpotifySyncToast] =
     useState<string | null>(null);
 
   /* ==========================================================================
@@ -720,14 +739,44 @@ function App() {
   }, []);
 
   /* ==========================================================================
-     LOAD HISTORY VIEW
+     LOAD HISTORY VIEW  (auto-polls every 30 s while visible)
      ========================================================================== */
 
+  async function refreshHistory() {
+    try {
+      setHistoryLoading(true);
+      const events = await getHistory();
+      setHistory(events);
+    } catch {
+      // keep existing list on error
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  async function handleSyncSpotify() {
+    if (!isConnected("spotify")) {
+      setSpotifyChoiceOpen(true);
+      return;
+    }
+    try {
+      setSpotifySyncing(true);
+      const res = await syncSpotifyHistory();
+      setSpotifySyncToast(res.message || `Synced ${res.imported} tracks successfully!`);
+      setTimeout(() => setSpotifySyncToast(null), 5000);
+      await refreshHistory();
+      await loadDashboard(true);
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || "Failed to sync Spotify tracks. Please reconnect Spotify.";
+      setSpotifySyncToast(`Spotify sync: ${msg}`);
+      setTimeout(() => setSpotifySyncToast(null), 5000);
+    } finally {
+      setSpotifySyncing(false);
+    }
+  }
+
   useEffect(() => {
-    if (
-      !authenticated ||
-      activeView !== "history"
-    ) {
+    if (!authenticated || activeView !== "history") {
       return;
     }
 
@@ -736,33 +785,27 @@ function App() {
     async function loadHistory() {
       try {
         setHistoryLoading(true);
-
-        const events =
-          await getHistory();
-
-        if (!cancelled) {
-          setHistory(events);
-        }
+        const events = await getHistory();
+        if (!cancelled) setHistory(events);
       } catch {
-        if (!cancelled) {
-          setHistory([]);
-        }
+        if (!cancelled) setHistory([]);
       } finally {
-        if (!cancelled) {
-          setHistoryLoading(false);
-        }
+        if (!cancelled) setHistoryLoading(false);
       }
     }
 
     loadHistory();
 
+    // Poll every 30 seconds so extension-synced videos show up automatically
+    const intervalId = window.setInterval(() => {
+      if (!cancelled) loadHistory();
+    }, 30_000);
+
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
     };
-  }, [
-    activeView,
-    authenticated,
-  ]);
+  }, [activeView, authenticated]);
 
   /* ==========================================================================
      DERIVED DATA
@@ -815,6 +858,7 @@ function App() {
             setImportResult(null);
             setImportError(null);
           }}
+          onAuthSuccess={refreshAuth}
         />
 
         {renderImportModal()}
@@ -1335,6 +1379,33 @@ function App() {
             </button>
 
             <button
+              onClick={() => setExtensionModalOpen(true)}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-purple-500/30 bg-purple-500/10 px-4 text-xs font-semibold text-purple-300 transition hover:border-purple-400 hover:bg-purple-500/20 hover:text-white shadow-lg shadow-purple-500/5"
+            >
+              <Puzzle size={14} className="text-purple-400" />
+              Extension Sync
+            </button>
+
+            <button
+              onClick={() => setAccountModalOpen(true)}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 text-xs font-semibold text-amber-300 transition hover:border-amber-400 hover:bg-amber-500/20 hover:text-white shadow-lg shadow-amber-500/5"
+              title="View your account details and personal data import token"
+            >
+              <Key size={14} className="text-amber-400" />
+              Account & Token
+            </button>
+
+            <button
+              onClick={handleSyncSpotify}
+              disabled={spotifySyncing}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#1DB954]/30 bg-[#1DB954]/10 px-4 text-xs font-semibold text-[#1DB954] transition hover:border-[#1DB954]/50 hover:bg-[#1DB954]/20 hover:text-white shadow-lg shadow-[#1DB954]/5 disabled:opacity-50"
+              title={isConnected("spotify") ? "Pull latest tracks from Spotify into your timeline" : "Connect & sync Spotify tracks"}
+            >
+              <Music size={14} className={spotifySyncing ? "animate-spin text-[#1DB954]" : "text-[#1DB954]"} />
+              {spotifySyncing ? "Syncing Spotify..." : "Sync Spotify"}
+            </button>
+
+            <button
               onClick={() => {
                 setImportSource(
                   "youtube",
@@ -1394,6 +1465,18 @@ function App() {
             </button>
 
           </div>
+
+          {spotifySyncToast && (
+            <div className="mb-4 flex items-center justify-between rounded-xl border border-[#1DB954]/30 bg-[#1DB954]/10 px-4 py-2.5 text-xs text-white animate-in fade-in duration-200">
+              <div className="flex items-center gap-2">
+                <Music size={14} className="text-[#1DB954]" />
+                <span>{spotifySyncToast}</span>
+              </div>
+              <button onClick={() => setSpotifySyncToast(null)} className="text-white/40 hover:text-white">
+                <X size={14} />
+              </button>
+            </div>
+          )}
 
           {/* WORKSPACE */}
 
@@ -2085,6 +2168,7 @@ function App() {
                   onOpenView={
                     setActiveView
                   }
+                  onRefresh={refreshHistory}
                 />
               )}
 
@@ -2128,6 +2212,22 @@ function App() {
               setWrappedOpen(false)
             }
             source={importSource}
+          />
+
+          <ExtensionSyncModal
+            open={extensionModalOpen}
+            onClose={() =>
+              setExtensionModalOpen(false)
+            }
+          />
+
+          <AccountTokenModal
+            open={accountModalOpen}
+            onClose={() =>
+              setAccountModalOpen(false)
+            }
+            user={auth?.user}
+            onLogout={logout}
           />
 
         </main>

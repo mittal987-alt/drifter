@@ -1,16 +1,22 @@
 import {
   Activity,
+  AlertTriangle,
   ArrowDownRight,
+  ArrowUpDown,
   ArrowUpRight,
   CalendarDays,
+  Check,
   Clock3,
+  Download,
   ExternalLink,
   Filter,
   GitBranch,
   History,
-  Map,
+  Map as MapIcon,
   Search,
+  SlidersHorizontal,
   Sparkles,
+  Trash2,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
@@ -23,7 +29,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 
@@ -35,7 +41,7 @@ import PredictionView from "@/components/prediction/PredictionView";
 import CorrelationView from "@/components/analytics/CorrelationView";
 import InterestDnaCard from "@/components/reports/InterestDnaCard";
 import type { DashboardData } from "@/services/analytics";
-import type { HistoryEvent } from "@/services/history";
+import { deleteHistoryEvent, clearHistory, type HistoryEvent } from "@/services/history";
 
 
 export type WorkspaceView =
@@ -166,7 +172,7 @@ export function OverviewView({ dashboard, onOpenView, onRefresh }: WorkspaceProp
                 <RefreshCw size={14} /> Re-analyze Topics
               </button>
             )}
-            <button className="workspace-action" onClick={() => onOpenView("map")}><Map size={15} /> Open map</button>
+            <button className="workspace-action" onClick={() => onOpenView("map")}><MapIcon size={15} /> Open map</button>
           </div>
         }
       />
@@ -193,7 +199,7 @@ export function OverviewView({ dashboard, onOpenView, onRefresh }: WorkspaceProp
 
       <div className="workspace-two-column">
         <Panel>
-          <div className="panel-heading"><div><span className="workspace-eyebrow">Most explored</span><h2>Topic landscape</h2></div><button className="icon-action" title="Open interest map" onClick={() => onOpenView("map")}><Map size={16} /></button></div>
+          <div className="panel-heading"><div><span className="workspace-eyebrow">Most explored</span><h2>Topic landscape</h2></div><button className="icon-action" title="Open interest map" onClick={() => onOpenView("map")}><MapIcon size={16} /></button></div>
           <TopicList topics={dashboard.top_topics} onSelect={() => onOpenView("map")} />
         </Panel>
         <Panel>
@@ -229,7 +235,7 @@ export function MapView({ dashboard, onOpenView }: WorkspaceProps) {
     <>
       <ViewIntro eyebrow="Spatial index / interest map" title="Where your attention lives." description="Nearby points share a semantic neighborhood. Select a topic to isolate one thread of your curiosity." action={<button className="workspace-action" onClick={() => onOpenView("history")}><History size={15} /> Browse events</button>} />
       <Panel className="map-workspace-panel">
-        <div className="map-toolbar"><div className="map-toolbar-title"><Map size={17} /><span>{selectedTopic || "All interests"}</span><small>{filteredPoints.length} points</small></div><div className="topic-filters"><button className={!selectedTopic ? "active" : ""} onClick={() => setSelectedTopic(null)}><Filter size={13} /> All</button>{topics.slice(0, 10).map((topic, index) => <button key={topic} className={selectedTopic === topic ? "active" : ""} onClick={() => setSelectedTopic(topic)}><i style={{ background: topicColor(topic, index) }} />{topic}</button>)}</div></div>
+        <div className="map-toolbar"><div className="map-toolbar-title"><MapIcon size={17} /><span>{selectedTopic || "All interests"}</span><small>{filteredPoints.length} points</small></div><div className="topic-filters"><button className={!selectedTopic ? "active" : ""} onClick={() => setSelectedTopic(null)}><Filter size={13} /> All</button>{topics.slice(0, 10).map((topic, index) => <button key={topic} className={selectedTopic === topic ? "active" : ""} onClick={() => setSelectedTopic(topic)}><i style={{ background: topicColor(topic, index) }} />{topic}</button>)}</div></div>
         <div className="full-map"><InterestMap data={mapData} /></div>
       </Panel>
       <div className="workspace-three-column"><MovementMini title="Rising" items={dashboard.evolution.rising.map((i) => i.topic)} icon={<TrendingUp size={16} />} tone="positive" /><MovementMini title="Fading" items={dashboard.evolution.fading.map((i) => i.topic)} icon={<TrendingDown size={16} />} tone="muted" /><MovementMini title="Emerging" items={dashboard.evolution.emerging.map((i) => i.topic)} icon={<Sparkles size={16} />} tone="warm" /></div>
@@ -244,7 +250,7 @@ export function EvolutionView({ dashboard, onOpenView }: WorkspaceProps) {
   const topicMomentum = [...new Set(momentum.map((item) => item.topic))].slice(0, 5);
   return (
     <>
-      <ViewIntro eyebrow="Temporal signal / evolution" title="Your interests are in motion." description="Trace the moments when one curiosity gave way to another." action={<button className="workspace-action" onClick={() => onOpenView("map")}><Map size={15} /> See the map</button>} />
+      <ViewIntro eyebrow="Temporal signal / evolution" title="Your interests are in motion." description="Trace the moments when one curiosity gave way to another." action={<button className="workspace-action" onClick={() => onOpenView("map")}><MapIcon size={15} /> See the map</button>} />
       <InterestEvolution monthlyProportions={dashboard.evolution.monthly_proportions} />
       <Panel className="chart-panel mt-6"><div className="panel-heading"><div><span className="workspace-eyebrow">Monthly movement</span><h2>Interest drift</h2></div><strong className="panel-stat">{dashboard.overview.current_drift.toFixed(3)}</strong></div><div className="large-chart">{chartData.length ? <ResponsiveContainer width="100%" height="100%"><AreaChart data={chartData}><defs><linearGradient id="workspaceDrift" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#f2b56b" stopOpacity={0.34} /><stop offset="100%" stopColor="#f2b56b" stopOpacity={0} /></linearGradient></defs><CartesianGrid vertical={false} stroke="rgba(255,255,255,0.07)" /><XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fill: "rgba(255,255,255,.4)", fontSize: 11 }} /><YAxis tickLine={false} axisLine={false} tick={{ fill: "rgba(255,255,255,.4)", fontSize: 11 }} /><Tooltip contentStyle={{ background: "#151512", border: "1px solid rgba(255,255,255,.12)", borderRadius: 8, color: "#fff" }} /><Area type="monotone" dataKey="drift" stroke="#f2b56b" fill="url(#workspaceDrift)" strokeWidth={2} /></AreaChart></ResponsiveContainer> : <Empty message="Import more history to see change over time." />}</div></Panel>
       <div className="workspace-two-column mt-6"><Panel><div className="panel-heading"><div><span className="workspace-eyebrow">Momentum</span><h2>Fastest-moving topics</h2></div><Activity size={16} /></div><div className="momentum-list">{topicMomentum.map((topic, index) => { const values = momentum.filter((item) => item.topic === topic); const latest = values[values.length - 1]?.value || 0; return <div className="momentum-row" key={topic}><i style={{ background: topicColor(topic, index) }} /><span>{topic}</span><strong className={latest >= 0 ? "positive" : "negative"}>{latest >= 0 ? "+" : ""}{latest.toFixed(2)}</strong></div>; })}</div></Panel><Panel><div className="panel-heading"><div><span className="workspace-eyebrow">Direction</span><h2>What is changing</h2></div><CalendarDays size={16} /></div><div className="direction-stack"><DirectionRow label="Rising" items={dashboard.evolution.rising.map((i) => i.topic)} icon={<ArrowUpRight size={15} />} /><DirectionRow label="Fading" items={dashboard.evolution.fading.map((i) => i.topic)} icon={<ArrowDownRight size={15} />} /><DirectionRow label="Emerging" items={dashboard.evolution.emerging.map((i) => i.topic)} icon={<Sparkles size={15} />} /></div></Panel></div>
@@ -265,8 +271,21 @@ export function BehaviorView({ dashboard, onOpenView }: WorkspaceProps) {
   );
 }
 
-export function HistoryView({ dashboard, history, historyLoading }: WorkspaceProps) {
+export function HistoryView({ dashboard, history, historyLoading, onRefresh }: WorkspaceProps) {
   const [query, setQuery] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "youtube" | "spotify">("all");
+  const [topicFilter, setTopicFilter] = useState<string>("all");
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+  const [localHistory, setLocalHistory] = useState<HistoryEvent[]>(history);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [showClearModal, setShowClearModal] = useState(false);
+  const [clearSource, setClearSource] = useState<"all" | "youtube" | "spotify">("all");
+  const [clearing, setClearing] = useState(false);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLocalHistory(history);
+  }, [history]);
 
   const topicMap = useMemo(() => {
     const map = new Map<number | string, string>();
@@ -279,30 +298,202 @@ export function HistoryView({ dashboard, history, historyLoading }: WorkspacePro
   }, [dashboard?.assignments]);
 
   const historyWithTopics = useMemo(() => {
-    return history.map((event) => {
+    return localHistory.map((event) => {
       const topic = topicMap.get(event.id) || (event.topic && event.topic !== "Unassigned" ? event.topic : "General Exploration");
       return { ...event, resolvedTopic: topic };
     });
-  }, [history, topicMap]);
+  }, [localHistory, topicMap]);
+
+  // Unique topic list for dropdown
+  const uniqueTopics = useMemo(() => {
+    const counts = new Map<string, number>();
+    historyWithTopics.forEach((e) => {
+      counts.set(e.resolvedTopic, (counts.get(e.resolvedTopic) || 0) + 1);
+    });
+    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  }, [historyWithTopics]);
+
+  // Source counts
+  const sourceCounts = useMemo(() => {
+    let yt = 0;
+    let sp = 0;
+    localHistory.forEach((e) => {
+      const s = (e.source || "").toLowerCase();
+      if (s === "youtube") yt++;
+      else if (s === "spotify") sp++;
+    });
+    return { all: localHistory.length, youtube: yt, spotify: sp };
+  }, [localHistory]);
 
   const filtered = useMemo(() => {
-    return historyWithTopics.filter((event) =>
-      `${event.title} ${event.artist || ""} ${event.source} ${event.resolvedTopic}`
-        .toLowerCase()
-        .includes(query.toLowerCase())
-    );
-  }, [historyWithTopics, query]);
+    return historyWithTopics
+      .filter((event) => {
+        // Source filter
+        if (sourceFilter !== "all" && event.source.toLowerCase() !== sourceFilter) {
+          return false;
+        }
+        // Topic filter
+        if (topicFilter !== "all" && event.resolvedTopic !== topicFilter) {
+          return false;
+        }
+        // Search query
+        if (query) {
+          const combined = `${event.title} ${event.artist || ""} ${event.source} ${event.resolvedTopic}`.toLowerCase();
+          return combined.includes(query.toLowerCase());
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const tA = new Date(a.timestamp).getTime();
+        const tB = new Date(b.timestamp).getTime();
+        return sortOrder === "desc" ? tB - tA : tA - tB;
+      });
+  }, [historyWithTopics, sourceFilter, topicFilter, query, sortOrder]);
+
+  function handleExportCsv() {
+    if (!filtered.length) return;
+    const headers = ["ID", "Timestamp", "Source", "Title", "Artist", "Topic", "URL"];
+    const rows = filtered.map((e) => [
+      e.id,
+      `"${new Date(e.timestamp).toISOString()}"`,
+      `"${e.source || ""}"`,
+      `"${(e.title || "").replace(/"/g, '""')}"`,
+      `"${(e.artist || "").replace(/"/g, '""')}"`,
+      `"${(e.resolvedTopic || e.topic || "").replace(/"/g, '""')}"`,
+      `"${(e.url || "").replace(/"/g, '""')}"`,
+    ]);
+    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `drifter_history_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    setExportNotice("Exported CSV successfully!");
+    setTimeout(() => setExportNotice(null), 2500);
+  }
+
+  function handleExportJson() {
+    if (!filtered.length) return;
+    const cleanItems = filtered.map((e) => ({
+      id: e.id,
+      timestamp: e.timestamp,
+      source: e.source,
+      title: e.title,
+      artist: e.artist || null,
+      topic: e.resolvedTopic || e.topic || "Other",
+      url: e.url || null,
+    }));
+    const blob = new Blob([JSON.stringify(cleanItems, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `drifter_history_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    setExportNotice("Exported JSON successfully!");
+    setTimeout(() => setExportNotice(null), 2500);
+  }
+
+  async function handleDeleteEvent(eventId: number) {
+    if (deletingId) return;
+    setDeletingId(eventId);
+    try {
+      await deleteHistoryEvent(eventId);
+      setLocalHistory((prev) => prev.filter((e) => e.id !== eventId));
+      onRefresh?.();
+    } catch (err) {
+      console.error("Failed to delete event", err);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function handleClearHistory() {
+    setClearing(true);
+    try {
+      const src = clearSource === "all" ? undefined : clearSource;
+      await clearHistory(src);
+      if (clearSource === "all") {
+        setLocalHistory([]);
+      } else {
+        setLocalHistory((prev) => prev.filter((e) => e.source.toLowerCase() !== clearSource));
+      }
+      setShowClearModal(false);
+      onRefresh?.();
+    } catch (err) {
+      console.error("Failed to clear history", err);
+    } finally {
+      setClearing(false);
+    }
+  }
 
   return (
     <>
       <ViewIntro
         eyebrow="Raw signal / history"
         title="Every trace behind the map."
-        description="Search the events that shaped your analysis, then follow them back to their source."
+        description="Filter, inspect, export, or manage the individual events that shaped your attention topology."
+        action={
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              className="workspace-action"
+              onClick={handleExportCsv}
+              disabled={historyLoading || !filtered.length}
+              title="Download filtered events as CSV"
+            >
+              <Download size={13} />
+              CSV
+            </button>
+            <button
+              className="workspace-action"
+              onClick={handleExportJson}
+              disabled={historyLoading || !filtered.length}
+              title="Download filtered events as JSON"
+            >
+              <Download size={13} />
+              JSON
+            </button>
+            {onRefresh && (
+              <button
+                className="workspace-action"
+                onClick={onRefresh}
+                disabled={historyLoading}
+                title="Reload history events from server"
+              >
+                <RefreshCw size={13} className={historyLoading ? "animate-spin" : ""} />
+                Refresh
+              </button>
+            )}
+            <button
+              className="workspace-action text-rose-400 hover:text-rose-300 hover:border-rose-500/40"
+              onClick={() => setShowClearModal(true)}
+              disabled={historyLoading || !localHistory.length}
+              title="Clear imported history"
+            >
+              <Trash2 size={13} />
+              Clear
+            </button>
+          </div>
+        }
       />
+
+      {exportNotice && (
+        <div className="mb-3 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-xs text-emerald-300 animate-in fade-in duration-200">
+          <Check size={14} />
+          <span>{exportNotice}</span>
+        </div>
+      )}
+
       <Panel>
+        {/* TOP TOOLBAR: SEARCH & STATS */}
         <div className="history-toolbar">
-          <div className="search-box">
+          <div className="search-box flex-1">
             <Search size={15} />
             <input
               value={query}
@@ -310,15 +501,85 @@ export function HistoryView({ dashboard, history, historyLoading }: WorkspacePro
               placeholder="Search titles, artists, topics, sources..."
             />
           </div>
-          <span className="history-count">{filtered.length} events</span>
+          <span className="history-count">
+            {filtered.length} of {localHistory.length} events
+          </span>
         </div>
 
-        <div className="history-table">
+        {/* SECONDARY TOOLBAR: FILTERS & SORTS */}
+        <div className="mt-3.5 pt-3 border-t border-white/[0.06] flex flex-wrap items-center justify-between gap-3 text-xs">
+          {/* SOURCE PILLS */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-white/35 font-medium mr-1">Source:</span>
+            <button
+              onClick={() => setSourceFilter("all")}
+              className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium transition ${
+                sourceFilter === "all"
+                  ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
+                  : "border-white/[0.08] bg-white/[0.02] text-white/50 hover:text-white"
+              }`}
+            >
+              All ({sourceCounts.all})
+            </button>
+            <button
+              onClick={() => setSourceFilter("youtube")}
+              className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium transition ${
+                sourceFilter === "youtube"
+                  ? "border-rose-500/40 bg-rose-500/10 text-rose-200"
+                  : "border-white/[0.08] bg-white/[0.02] text-white/50 hover:text-white"
+              }`}
+            >
+              YouTube ({sourceCounts.youtube})
+            </button>
+            <button
+              onClick={() => setSourceFilter("spotify")}
+              className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium transition ${
+                sourceFilter === "spotify"
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+                  : "border-white/[0.08] bg-white/[0.02] text-white/50 hover:text-white"
+              }`}
+            >
+              Spotify ({sourceCounts.spotify})
+            </button>
+          </div>
+
+          {/* TOPIC SELECT & SORT */}
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-white/35 font-medium">Topic:</span>
+              <select
+                value={topicFilter}
+                onChange={(e) => setTopicFilter(e.target.value)}
+                className="rounded-lg border border-white/[0.1] bg-[#121216] px-2.5 py-1 text-[11px] text-white/80 focus:outline-none focus:border-amber-400/50"
+              >
+                <option value="all">All Topics ({uniqueTopics.length})</option>
+                {uniqueTopics.map(([tName, tCount]) => (
+                  <option key={tName} value={tName}>
+                    {tName} ({tCount})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              onClick={() => setSortOrder((s) => (s === "desc" ? "asc" : "desc"))}
+              className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.02] px-2.5 py-1 text-[11px] text-white/55 hover:text-white transition"
+              title="Toggle sort direction"
+            >
+              <ArrowUpDown size={12} />
+              <span>{sortOrder === "desc" ? "Newest First" : "Oldest First"}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* TABLE */}
+        <div className="history-table mt-4">
           <div className="history-table-head">
             <span>Event</span>
             <span>Topic</span>
             <span>Source</span>
             <span>Date</span>
+            <span className="text-right">Actions</span>
           </div>
 
           {historyLoading ? (
@@ -326,8 +587,9 @@ export function HistoryView({ dashboard, history, historyLoading }: WorkspacePro
           ) : (
             filtered.map((event) => {
               const color = topicColor(event.resolvedTopic);
+              const isDeleting = deletingId === event.id;
               return (
-                <div className="history-row" key={event.id}>
+                <div className={`history-row ${isDeleting ? "opacity-30 pointer-events-none" : ""}`} key={event.id}>
                   <div>
                     <strong>{event.title}</strong>
                     <span>{event.artist || "Untitled activity"}</span>
@@ -354,30 +616,117 @@ export function HistoryView({ dashboard, history, historyLoading }: WorkspacePro
                     })}
                   </time>
 
-                  {event.url && (
-                    <a
-                      href={event.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      title="Open source"
+                  <div className="flex items-center justify-end gap-2">
+                    {event.url && (
+                      <a
+                        href={event.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-white/40 hover:text-white transition p-1"
+                        title="Open source"
+                      >
+                        <ExternalLink size={13} />
+                      </a>
+                    )}
+                    <button
+                      onClick={() => handleDeleteEvent(event.id)}
+                      disabled={isDeleting}
+                      className="text-white/30 hover:text-rose-400 transition p-1 rounded hover:bg-rose-500/10"
+                      title="Delete this event"
                     >
-                      <ExternalLink size={14} />
-                    </a>
-                  )}
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </div>
               );
             })
           )}
 
           {!historyLoading && !filtered.length && (
-            <Empty message="No matching events." />
+            <Empty message="No matching events found for the active filters." />
           )}
         </div>
       </Panel>
 
       <p className="workspace-footnote">
-        Showing {historyWithTopics.length.toLocaleString()} history events categorized across your analyzed topics.
+        Showing {filtered.length.toLocaleString()} of {localHistory.length.toLocaleString()} history events categorized across your analyzed topics.
       </p>
+
+      {/* CLEAR HISTORY CONFIRMATION MODAL */}
+      {showClearModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0e0e12] p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-500/15 border border-rose-500/25 text-rose-400">
+                <AlertTriangle size={18} />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white">Clear History Events</h3>
+                <p className="text-xs text-white/45">This action permanently removes traces from your database.</p>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-white/[0.07]">
+              <label className="text-xs font-medium text-white/70 block">Select Scope to Clear:</label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setClearSource("all")}
+                  className={`rounded-xl border p-2.5 text-center text-xs font-medium transition ${
+                    clearSource === "all"
+                      ? "border-rose-500/50 bg-rose-500/15 text-rose-200"
+                      : "border-white/[0.08] bg-white/[0.02] text-white/60 hover:text-white"
+                  }`}
+                >
+                  All ({sourceCounts.all})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setClearSource("youtube")}
+                  className={`rounded-xl border p-2.5 text-center text-xs font-medium transition ${
+                    clearSource === "youtube"
+                      ? "border-rose-500/50 bg-rose-500/15 text-rose-200"
+                      : "border-white/[0.08] bg-white/[0.02] text-white/60 hover:text-white"
+                  }`}
+                >
+                  YouTube ({sourceCounts.youtube})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setClearSource("spotify")}
+                  className={`rounded-xl border p-2.5 text-center text-xs font-medium transition ${
+                    clearSource === "spotify"
+                      ? "border-rose-500/50 bg-rose-500/15 text-rose-200"
+                      : "border-white/[0.08] bg-white/[0.02] text-white/60 hover:text-white"
+                  }`}
+                >
+                  Spotify ({sourceCounts.spotify})
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-white/[0.07]">
+              <button
+                type="button"
+                onClick={() => setShowClearModal(false)}
+                disabled={clearing}
+                className="rounded-xl border border-white/10 px-4 py-2 text-xs font-medium text-white/60 hover:text-white hover:bg-white/[0.04] transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleClearHistory}
+                disabled={clearing}
+                className="rounded-xl bg-rose-600 hover:bg-rose-500 px-4 py-2 text-xs font-semibold text-white transition flex items-center gap-1.5"
+              >
+                {clearing && <RefreshCw size={12} className="animate-spin" />}
+                {clearing ? "Clearing..." : "Confirm & Clear"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

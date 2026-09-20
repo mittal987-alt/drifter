@@ -17,6 +17,32 @@ export const authService = {
     return response.data;
   },
 
+  async loginWithPassword(email: string, password: string): Promise<AuthResponse> {
+    const response = await axios.post<AuthResponse>(
+      `${API_URL}/api/auth/login`,
+      { email, password },
+      { withCredentials: true }
+    );
+    return response.data;
+  },
+
+  async registerWithPassword(email: string, password: string, name?: string): Promise<AuthResponse> {
+    const response = await axios.post<AuthResponse>(
+      `${API_URL}/api/auth/register`,
+      { email, password, name },
+      { withCredentials: true }
+    );
+    return response.data;
+  },
+
+  async getSyncToken(): Promise<{ user_id: number; token: string }> {
+    const response = await axios.get<{ user_id: number; token: string }>(
+      `${API_URL}/api/auth/token`,
+      { withCredentials: true }
+    );
+    return response.data;
+  },
+
   async logout(): Promise<void> {
     await axios.post(
       `${API_URL}/api/auth/logout`,

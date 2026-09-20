@@ -31,6 +31,16 @@ def init_db():
     with engine.connect() as conn:
         inspector = inspect(conn)
         tables = inspector.get_table_names()
+        if "users" in tables:
+            columns = [c["name"] for c in inspector.get_columns("users")]
+            for col_name, col_type in [
+                ("email", "VARCHAR(255)"),
+                ("password_hash", "VARCHAR(255)"),
+                ("name", "VARCHAR(255)"),
+            ]:
+                if col_name not in columns:
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}"))
+                    conn.commit()
 
         if "connections" in tables:
             columns = [c["name"] for c in inspector.get_columns("connections")]

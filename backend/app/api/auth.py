@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import os
 import secrets
 from datetime import datetime, timedelta
 import hashlib
@@ -9,8 +10,10 @@ from urllib.parse import urlencode
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.api.dependencies import generate_extension_token, get_current_user_id
 from app.config import settings
 from app.database.database import get_db
 from app.database.models import Connection, User
@@ -26,6 +29,42 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 _processed_spotify_codes: dict[str, RedirectResponse] = {}
 _spotify_code_locks: dict[str, asyncio.Lock] = {}
 _spotify_global_lock = asyncio.Lock()
+
+
+# ---------------------------------------------------------
+# Password Hashing Helpers
+# ---------------------------------------------------------
+
+def hash_password(password: str) -> str:
+    salt = os.urandom(16).hex()
+    key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000).hex()
+    return f"{salt}${key}"
+
+
+def verify_password(password: str, stored_hash: str | None) -> bool:
+    if not stored_hash or "$" not in stored_hash:
+        return False
+    try:
+        salt, key = stored_hash.split("$", 1)
+        computed = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000).hex()
+        return hmac.compare_digest(key, computed)
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------
+# Schemas
+# ---------------------------------------------------------
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    name: str | None = None
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 
 # ---------------------------------------------------------
@@ -60,11 +99,16 @@ def get_me(
         .all()
     )
 
+    sync_token = generate_extension_token(user.id)
+
     return {
         "authenticated": True,
         "user": {
             "id": user.id,
+            "email": user.email,
+            "name": user.name,
         },
+        "sync_token": sync_token,
         "connections": [
             {
                 "provider": (
@@ -77,6 +121,96 @@ def get_me(
             }
             for connection in connections
         ],
+    }
+
+
+# ---------------------------------------------------------
+# Email & Password Manual Register / Login
+# ---------------------------------------------------------
+
+@router.post("/register")
+def register(
+    payload: RegisterRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    email = payload.email.strip().lower()
+    if not email or "@" not in email or "." not in email:
+        raise HTTPException(status_code=400, detail="Invalid email address.")
+
+    if len(payload.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
+
+    existing = db.query(User).filter(User.email == email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="An account with this email already exists.")
+
+    new_user = User(
+        email=email,
+        password_hash=hash_password(payload.password),
+        name=payload.name.strip() if payload.name else None,
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    request.session["user_id"] = new_user.id
+    sync_token = generate_extension_token(new_user.id)
+
+    return {
+        "authenticated": True,
+        "user": {
+            "id": new_user.id,
+            "email": new_user.email,
+            "name": new_user.name,
+        },
+        "sync_token": sync_token,
+        "message": "Account created successfully.",
+    }
+
+
+@router.post("/login")
+def login(
+    payload: LoginRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    email = payload.email.strip().lower()
+    user = db.query(User).filter(User.email == email).first()
+
+    if not user or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+    request.session["user_id"] = user.id
+    sync_token = generate_extension_token(user.id)
+
+    return {
+        "authenticated": True,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+        },
+        "sync_token": sync_token,
+        "message": "Logged in successfully.",
+    }
+
+
+@router.get("/token")
+def get_user_sync_token(
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Return the personal data import and Chrome extension sync token for the logged-in user.
+    """
+    token = generate_extension_token(user_id)
+    return {
+        "user_id": user_id,
+        "token": token,
+        "usage": {
+            "header": f"Authorization: Bearer {token}",
+            "x_sync_token": f"X-Sync-Token: {token}",
+        },
     }
 
 

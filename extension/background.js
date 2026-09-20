@@ -74,10 +74,8 @@ async function handleIncomingWatchEvent(event) {
   await chrome.storage.local.set({ watchQueue: queue });
   console.log(`[Drifter Sync] Event queued (${queue.length} total in queue).`);
 
-  // Auto flush if 5 or more events accumulated
-  if (queue.length >= 5) {
-    flushQueueToBackend();
-  }
+  // Auto flush immediately on every new event so the dashboard stays live
+  flushQueueToBackend();
 }
 
 async function flushQueueToBackend() {

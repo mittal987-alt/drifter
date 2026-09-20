@@ -179,6 +179,37 @@ export async function getLatestGoogleExportStatus(): Promise<GoogleExportStatus>
 }
 
 /* ==========================================================================
+   DELETE HISTORY EVENT
+   ========================================================================== */
+
+export async function deleteHistoryEvent(
+  eventId: number,
+): Promise<{ success: boolean; event_id: number; message: string }> {
+  const response = await axios.delete<{ success: boolean; event_id: number; message: string }>(
+    `${API_URL}/api/history/events/${eventId}`,
+    { withCredentials: true },
+  );
+  return response.data;
+}
+
+/* ==========================================================================
+   CLEAR HISTORY
+   ========================================================================== */
+
+export async function clearHistory(
+  source?: string,
+): Promise<{ success: boolean; deleted: number; source?: string }> {
+  const response = await axios.delete<{ success: boolean; deleted: number; source?: string }>(
+    `${API_URL}/api/history/clear`,
+    {
+      params: source ? { source } : {},
+      withCredentials: true,
+    },
+  );
+  return response.data;
+}
+
+/* ==========================================================================
    SERVICE OBJECT
    ========================================================================== */
 
@@ -187,4 +218,6 @@ export const historyService = {
   importHistory,
   getGoogleExportStatus,
   getLatestGoogleExportStatus,
+  deleteHistoryEvent,
+  clearHistory,
 };

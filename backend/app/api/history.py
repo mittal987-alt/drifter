@@ -442,6 +442,7 @@ def clear_history(
         if source not in {
             "youtube",
             "spotify",
+            "extension",
         }:
             raise HTTPException(
                 status_code=400,
@@ -485,4 +486,48 @@ def clear_history(
         "success": True,
         "deleted": deleted,
         "source": source,
+    }
+
+
+# =============================================================
+# DELETE SINGLE EVENT
+# =============================================================
+
+@router.delete("/events/{event_id}")
+def delete_history_event(
+    event_id: int,
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """
+    Delete a specific history event belonging to the current user.
+    """
+    event = (
+        db.query(HistoryEvent)
+        .filter(
+            HistoryEvent.id == event_id,
+            HistoryEvent.user_id == user_id,
+        )
+        .first()
+    )
+
+    if not event:
+        raise HTTPException(
+            status_code=404,
+            detail="History event not found.",
+        )
+
+    ev_source = event.source
+    db.delete(event)
+    db.commit()
+
+    # Clear analysis caches so next load reflects deletion
+    delete_cached_analysis(user_id=user_id, source=None)
+    if ev_source:
+        delete_cached_analysis(user_id=user_id, source=ev_source)
+
+    return {
+        "success": True,
+        "event_id": event_id,
+        "message": "Event deleted successfully.",
     }
