@@ -250,8 +250,30 @@ def get_dashboard(
         if cached and cached.get("event_count") == len(events) and cached.get("analysis"):
             analysis = cached["analysis"]
             assignments = analysis.get("assignments", [])
+            evolution = analysis.get("evolution", {})
+            monthly_proportions = evolution.get("monthly_proportions", {})
+            monthly_drift = evolution.get("monthly_drift", {})
+            current_drift_val = list(monthly_drift.values())[-1] if monthly_drift else 0.0
+
+            needs_time_refresh = (
+                len(events) >= 2
+                and (
+                    not evolution.get("emerging")
+                    or current_drift_val == 0.0
+                )
+            )
             # If all assignments are labeled "Other", bypass cache to re-analyze with categorization
-            if not (assignments and all(a.get("topic") == "Other" for a in assignments if isinstance(a, dict))):
+            if (
+                not needs_time_refresh
+                and not (
+                    assignments
+                    and all(
+                        a.get("topic") == "Other"
+                        for a in assignments
+                        if isinstance(a, dict)
+                    )
+                )
+            ):
                 return build_dashboard_response(
                     analysis,
                     cached=True,
@@ -387,10 +409,10 @@ def build_dashboard_response(
     # EMERGING
     # ========================================================
 
-    emerging = evolution.get(
-        "emerging",
-        []
-    )
+    emerging = [
+        item for item in evolution.get("emerging", [])
+        if isinstance(item, dict) and item.get("topic") not in ("Other", "Unassigned", "Unknown")
+    ]
 
     # ========================================================
     # DRIFT
@@ -405,11 +427,10 @@ def build_dashboard_response(
         monthly_drift.values()
     )
 
-    current_drift = 0
+    current_drift = 0.0
 
     if drift_values:
-
-        current_drift = drift_values[-1]
+        current_drift = float(drift_values[-1])
 
     # ========================================================
     # RABBIT HOLES
@@ -684,4 +705,4 @@ def get_interest_dna_profile(
     return generate_interest_dna(
         assignments=assignments,
         analysis=analysis,
-    )
+    )

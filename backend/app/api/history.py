@@ -30,6 +30,9 @@ from app.services.analysis_runner import run_user_analysis
 from app.analytics.topics import classify_single_event
 
 
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
+
 # =============================================================
 # SAVE HISTORY EVENTS
 # =============================================================
@@ -43,17 +46,21 @@ def save_history_events(
     imported = 0
     duplicates = 0
 
-    # Fetch existing event hashes for this user to avoid duplicate entries
+    if not events:
+        return 0, 0
+
+    # Fetch all existing event hashes in the database to prevent constraint collisions
     existing_hashes = {
         row[0]
-        for row in db.query(HistoryEvent.event_hash).filter(HistoryEvent.user_id == user_id).all()
+        for row in db.query(HistoryEvent.event_hash).all()
         if row[0]
     }
 
     seen_in_batch = set()
+    records_to_insert = []
 
     for event in events:
-        event_hash = create_event_hash(event)
+        event_hash = create_event_hash(event, user_id=user_id)
 
         if event_hash in existing_hashes or event_hash in seen_in_batch:
             duplicates += 1
@@ -62,7 +69,7 @@ def save_history_events(
         seen_in_batch.add(event_hash)
         ev_source = event.get("source") or source
 
-        ts = event["timestamp"]
+        ts = event.get("timestamp")
         if not isinstance(ts, datetime):
             if isinstance(ts, str):
                 try:
@@ -72,26 +79,65 @@ def save_history_events(
             else:
                 ts = datetime.utcnow()
 
-        db.add(
-            HistoryEvent(
-                user_id=user_id,
-                timestamp=ts,
-                source=ev_source,
-                title=event["title"],
-                artist=event.get("artist"),
-                url=event.get("url"),
-                duration=event.get("duration"),
-                event_hash=event_hash,
-                metadata_json=json.dumps(
-                    event.get("metadata", {}),
-                    default=str,
-                ),
-            )
-        )
+        row_dict = {
+            "user_id": user_id,
+            "timestamp": ts,
+            "source": ev_source,
+            "title": event.get("title", "Untitled") or "Untitled",
+            "artist": event.get("artist"),
+            "url": event.get("url"),
+            "duration": event.get("duration"),
+            "event_hash": event_hash,
+            "metadata_json": json.dumps(
+                event.get("metadata", {}),
+                default=str,
+            ),
+            "created_at": datetime.utcnow(),
+        }
+        records_to_insert.append(row_dict)
 
-        imported += 1
+    if not records_to_insert:
+        return 0, duplicates
 
-    db.commit()
+    BATCH_SIZE = 500
+    dialect_name = db.bind.dialect.name if db.bind else "sqlite"
+    is_sqlite = dialect_name == "sqlite"
+
+    for i in range(0, len(records_to_insert), BATCH_SIZE):
+        batch = records_to_insert[i : i + BATCH_SIZE]
+        if is_sqlite:
+            try:
+                stmt = sqlite_insert(HistoryEvent).values(batch).on_conflict_do_nothing()
+                db.execute(stmt)
+                db.commit()
+                imported += len(batch)
+            except Exception:
+                db.rollback()
+                for item in batch:
+                    try:
+                        single_stmt = sqlite_insert(HistoryEvent).values([item]).on_conflict_do_nothing()
+                        db.execute(single_stmt)
+                        db.commit()
+                        imported += 1
+                    except Exception:
+                        db.rollback()
+                        duplicates += 1
+        else:
+            try:
+                orm_objects = [HistoryEvent(**item) for item in batch]
+                db.add_all(orm_objects)
+                db.commit()
+                imported += len(batch)
+            except Exception:
+                db.rollback()
+                for item in batch:
+                    try:
+                        db.add(HistoryEvent(**item))
+                        db.commit()
+                        imported += 1
+                    except Exception:
+                        db.rollback()
+                        duplicates += 1
 
     # ---------------------------------------------------------
     # Clear old analysis cache

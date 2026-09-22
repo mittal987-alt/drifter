@@ -168,51 +168,20 @@ async def sync_spotify_user_history(
     except Exception as exc:
         print(f"[Spotify Sync] Error fetching top tracks: {exc}", flush=True)
 
-    imported = 0
-    duplicates = 0
+    from app.api.history import save_history_events
 
+    events = []
     for item in raw_items:
         event = normalize_spotify_event(item)
-        if not event or not event.get("title"):
-            continue
+        if event and event.get("title"):
+            events.append(event)
 
-        event_hash = create_event_hash(event)
-        existing = (
-            db.query(HistoryEvent.id)
-            .filter(
-                HistoryEvent.user_id == user_id,
-                HistoryEvent.event_hash == event_hash,
-            )
-            .first()
-        )
-
-        if existing:
-            duplicates += 1
-            continue
-
-        db.add(
-            HistoryEvent(
-                user_id=user_id,
-                timestamp=event["timestamp"],
-                source="spotify",
-                title=event["title"],
-                artist=event.get("artist"),
-                url=event.get("url"),
-                duration=event.get("duration"),
-                event_hash=event_hash,
-                metadata_json=json.dumps(
-                    event.get("metadata", {}),
-                    default=str,
-                ),
-            )
-        )
-        imported += 1
-
-    db.commit()
-
-    if imported > 0:
-        delete_cached_analysis(user_id=user_id, source="spotify")
-        delete_cached_analysis(user_id=user_id, source=None)
+    imported, duplicates = save_history_events(
+        db=db,
+        user_id=user_id,
+        events=events,
+        source="spotify",
+    )
 
     print(f"[Spotify Sync] Completed for user {user_id}: {imported} imported, {duplicates} duplicates.", flush=True)
     return {"imported": imported, "duplicates": duplicates, "total": len(raw_items)}

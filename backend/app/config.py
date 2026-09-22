@@ -5,6 +5,8 @@ load_dotenv(override=True)
 
 
 class Settings:
+    ENV = os.getenv("ENV", "development").lower()
+
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 

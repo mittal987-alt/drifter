@@ -31,6 +31,8 @@ import {
   Puzzle,
   Music,
   Key,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 import {
@@ -150,6 +152,25 @@ function App() {
       if (path.includes("history")) return "history";
       return "overview";
     });
+
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    return (localStorage.getItem("drifter_theme") as "dark" | "light") || "dark";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("drifter_theme", theme);
+    if (theme === "light") {
+      document.documentElement.classList.add("light");
+      document.documentElement.classList.remove("dark");
+      document.body.classList.add("light");
+      document.body.classList.remove("dark");
+    } else {
+      document.documentElement.classList.add("dark");
+      document.documentElement.classList.remove("light");
+      document.body.classList.add("dark");
+      document.body.classList.remove("light");
+    }
+  }, [theme]);
 
   useEffect(() => {
     const targetPath = activeView === "overview" ? "/" : `/${activeView}`;
@@ -647,6 +668,7 @@ function App() {
   }, [
     authLoading,
     authenticated,
+    activeView,
   ]);
 
   useEffect(() => {
@@ -1114,7 +1136,7 @@ function App() {
      ========================================================================== */
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white">
+    <div className="app-shell min-h-screen bg-[#050505] text-white">
 
       {/* GLOBAL BACKGROUND */}
 
@@ -1454,6 +1476,19 @@ function App() {
 
               Refresh analysis
 
+            </button>
+
+            <button
+              onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 text-xs font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+              title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
+            >
+              {theme === "dark" ? (
+                <Sun size={14} className="text-amber-400" />
+              ) : (
+                <Moon size={14} className="text-purple-400" />
+              )}
+              <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
             </button>
 
             <button

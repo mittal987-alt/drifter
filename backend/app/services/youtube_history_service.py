@@ -201,9 +201,10 @@ def parse_youtube_history(
     return events
 
 
-def create_event_hash(event: dict[str, Any]) -> str:
+def create_event_hash(event: dict[str, Any], user_id: int | None = None) -> str:
     raw = "|".join(
         [
+            str(user_id or ""),
             str(event.get("source", "")),
             str(event.get("timestamp", "")),
             str(event.get("title", "")),

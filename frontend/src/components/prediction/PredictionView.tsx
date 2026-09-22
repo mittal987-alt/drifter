@@ -49,11 +49,11 @@ export default function PredictionView({ source }: PredictionViewProps) {
   }
 
   // Filter predictions by selected horizon
-  const filteredPredictions = data?.predictions.filter((pred) => {
+  const filteredPredictions = data?.predictions?.filter((pred) => {
     if (selectedHorizon === "all") return true;
-    if (selectedHorizon === "short") return pred.horizon.includes("7-14");
-    if (selectedHorizon === "mid") return pred.horizon.includes("2-4") || pred.horizon.includes("weeks");
-    if (selectedHorizon === "long") return pred.horizon.includes("month") || pred.horizon.includes("Emerging");
+    if (selectedHorizon === "short") return (pred.horizon || "").includes("7-14");
+    if (selectedHorizon === "mid") return (pred.horizon || "").includes("2-4") || (pred.horizon || "").includes("weeks");
+    if (selectedHorizon === "long") return (pred.horizon || "").includes("month") || (pred.horizon || "").includes("Emerging");
     return true;
   }) || [];
 

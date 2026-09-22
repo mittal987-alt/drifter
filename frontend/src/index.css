@@ -92,11 +92,23 @@ html {
   background: #050505;
 }
 
+html.light {
+  background: #f8f9fc;
+  color-scheme: light;
+}
+
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
   background: #050505;
+  color: white;
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+body.light {
+  background: #f8f9fc;
+  color: #0f172a;
 }
 
 button {
@@ -107,8 +119,208 @@ button {
   background: rgba(255, 255, 255, 0.2);
 }
 
+body.light ::selection {
+  background: rgba(139, 92, 246, 0.2);
+}
+
 .workspace-shell {
   padding-top: 2.25rem;
+}
+
+/* ========================================================= */
+/* LIGHT MODE ADAPTIVE STYLES */
+/* ========================================================= */
+
+body.light aside,
+body.light .sidebar {
+  background: #ffffff !important;
+  border-right-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+body.light aside .text-white\/35,
+body.light aside .text-white\/40,
+body.light aside .text-white\/50,
+body.light aside .text-white\/70 {
+  color: #64748b !important;
+}
+
+body.light .workspace-intro h1 {
+  color: #0f172a;
+}
+
+body.light .workspace-intro p:not(.workspace-eyebrow) {
+  color: #475569;
+}
+
+body.light .workspace-eyebrow,
+body.light .signal-label {
+  color: #64748b;
+}
+
+body.light .signal-card,
+body.light .workspace-panel {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+}
+
+body.light .signal-card-featured {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: radial-gradient(circle at 85% 15%, rgba(245, 158, 11, 0.08), transparent 40%), #ffffff;
+}
+
+body.light .signal-card strong,
+body.light .panel-heading h2 {
+  color: #0f172a;
+}
+
+body.light .signal-card p {
+  color: #64748b;
+}
+
+body.light .workspace-action,
+body.light .topic-filters button {
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  background: #f1f5f9;
+}
+
+body.light .workspace-action:hover,
+body.light .topic-filters button:hover,
+body.light .topic-filters button.active {
+  border-color: #8b5cf6;
+  color: #7c3aed;
+  background: #f5f3ff;
+}
+
+body.light .topic-list-row {
+  color: #334155;
+}
+
+body.light .topic-list-row:hover .topic-name {
+  color: #7c3aed;
+}
+
+body.light .topic-track {
+  background: #e2e8f0;
+}
+
+body.light .trace-row {
+  border-bottom-color: #f1f5f9;
+}
+
+body.light .trace-row strong {
+  color: #0f172a;
+}
+
+body.light .trace-row div span,
+body.light .trace-row time {
+  color: #64748b;
+}
+
+body.light .history-toolbar {
+  border-bottom-color: #e2e8f0;
+}
+
+body.light .history-table-head {
+  color: #64748b;
+}
+
+body.light .history-row {
+  border-top-color: #f1f5f9;
+}
+
+body.light .history-row strong {
+  color: #0f172a;
+}
+
+body.light .history-row div span,
+body.light .history-row time {
+  color: #64748b;
+}
+
+body.light .search-box input {
+  color: #0f172a;
+}
+
+body.light .search-box input::placeholder {
+  color: #94a3b8;
+}
+
+body.light .direction-row strong {
+  color: #0f172a;
+}
+
+body.light .direction-row p {
+  color: #64748b;
+}
+
+body.light .momentum-row,
+body.light .bar-row {
+  border-bottom-color: #f1f5f9;
+  color: #334155;
+}
+
+body.light .bar-row > div {
+  background: #e2e8f0;
+}
+
+body.light .workspace-footnote {
+  color: #94a3b8;
+}
+
+body.light .empty-workspace,
+body.light .workspace-empty {
+  color: #94a3b8;
+}
+
+body.light .app-shell {
+  background: #f8f9fc !important;
+  color: #0f172a !important;
+}
+
+body.light .app-shell > .pointer-events-none {
+  opacity: 0;
+}
+
+body.light .app-shell [class*="bg-[#050505]"],
+body.light .app-shell [class*="bg-[#0b0b0b]"],
+body.light .app-shell [class*="bg-[#0e0e12]"],
+body.light .app-shell [class*="bg-[#121216]"] {
+  background: #ffffff !important;
+}
+
+body.light .app-shell [class*="bg-black/"] {
+  background: rgba(15, 23, 42, 0.04) !important;
+}
+
+body.light .app-shell [class*="bg-white/"] {
+  background: rgba(15, 23, 42, 0.04) !important;
+}
+
+body.light .app-shell [class*="border-white/"] {
+  border-color: #e2e8f0 !important;
+}
+
+body.light .app-shell [class*="text-white/"] {
+  color: #64748b !important;
+}
+
+body.light .app-shell [class~="text-white"] {
+  color: #0f172a !important;
+}
+
+body.light .app-shell .history-row strong,
+body.light .app-shell .panel-heading h2,
+body.light .app-shell .workspace-intro h1 {
+  color: #0f172a !important;
+}
+
+body.light .app-shell select {
+  color: #334155 !important;
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
 }
 
 .legacy-overview {

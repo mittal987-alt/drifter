@@ -92,33 +92,6 @@ def init_db():
                     conn.execute(text(f"ALTER TABLE portability_export_jobs ADD COLUMN {col_name} {col_type}"))
                     conn.commit()
 
-        # Consolidate user data: ensure primary user (id=1) has the registered email/password/events
-        try:
-            reg_user = conn.execute(text("SELECT id, email, password_hash, name FROM users WHERE email IS NOT NULL LIMIT 1")).fetchone()
-            if reg_user:
-                reg_id, email, pwd_hash, name = reg_user
-                if reg_id != 1:
-                    # Update user 1 with registered credentials
-                    conn.execute(
-                        text("UPDATE users SET email = :email, password_hash = :pwd, name = :name WHERE id = 1"),
-                        {"email": email, "pwd": pwd_hash, "name": name},
-                    )
-                    # Move all history events and analyses to user 1
-                    conn.execute(text(f"UPDATE history_events SET user_id = 1 WHERE user_id = {reg_id}"))
-                    conn.execute(text(f"UPDATE analysis_results SET user_id = 1 WHERE user_id = {reg_id}"))
-                    conn.execute(text(f"UPDATE connections SET user_id = 1 WHERE user_id = {reg_id}"))
-                    conn.execute(text(f"DELETE FROM users WHERE id = {reg_id}"))
-                    conn.commit()
-            else:
-                # If events exist under user_id != 1, assign them to user 1
-                conn.execute(text("UPDATE history_events SET user_id = 1 WHERE user_id != 1"))
-                conn.execute(text("UPDATE analysis_results SET user_id = 1 WHERE user_id != 1"))
-                conn.execute(text("UPDATE connections SET user_id = 1 WHERE user_id != 1"))
-                conn.commit()
-        except Exception as e:
-            print(f"[Drifter Migration Error]: {e}")
-
-
 init_db()
 
 
@@ -143,8 +116,8 @@ app = FastAPI(
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.SESSION_SECRET,
-    same_site="lax",
-    https_only=False,
+    same_site="none" if settings.ENV == "production" else "lax",
+    https_only=settings.ENV == "production",
 )
 
 

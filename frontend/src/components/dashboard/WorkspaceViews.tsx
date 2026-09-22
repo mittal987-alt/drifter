@@ -189,11 +189,13 @@ export function OverviewView({ dashboard, onOpenView, onRefresh }: WorkspaceProp
           <span className="signal-label">Latest drift</span>
           <strong>{overview.current_drift.toFixed(3)}</strong>
           <p>Change in your interest distribution over the latest period.</p>
+          <button onClick={() => onOpenView("evolution")} className="text-action">View trajectory <ArrowUpRight size={14} /></button>
         </div>
         <div className="signal-card">
           <span className="signal-label">New directions</span>
           <strong>{dashboard.evolution.emerging.length}</strong>
           <p>Emerging interests detected in your recent history.</p>
+          <button onClick={() => onOpenView("evolution")} className="text-action">Inspect emerging <ArrowUpRight size={14} /></button>
         </div>
       </div>
 
@@ -224,36 +226,70 @@ export function OverviewView({ dashboard, onOpenView, onRefresh }: WorkspaceProp
 }
 
 export function MapView({ dashboard, onOpenView }: WorkspaceProps) {
-  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
-  const interestMap = dashboard.visualizations.interest_map;
-  const points = interestMap.points;
-  const topics = [...new Set(points.map((point) => point.topic || "Unknown"))];
-  const filteredPoints = selectedTopic ? points.filter((point) => (point.topic || "Unknown") === selectedTopic) : points;
-  const mapData: typeof interestMap = { ...interestMap, points: filteredPoints };
+  const interestMap = dashboard?.visualizations?.interest_map || { points: [], topic_centers: [] };
 
   return (
     <>
-      <ViewIntro eyebrow="Spatial index / interest map" title="Where your attention lives." description="Nearby points share a semantic neighborhood. Select a topic to isolate one thread of your curiosity." action={<button className="workspace-action" onClick={() => onOpenView("history")}><History size={15} /> Browse events</button>} />
-      <Panel className="map-workspace-panel">
-        <div className="map-toolbar"><div className="map-toolbar-title"><MapIcon size={17} /><span>{selectedTopic || "All interests"}</span><small>{filteredPoints.length} points</small></div><div className="topic-filters"><button className={!selectedTopic ? "active" : ""} onClick={() => setSelectedTopic(null)}><Filter size={13} /> All</button>{topics.slice(0, 10).map((topic, index) => <button key={topic} className={selectedTopic === topic ? "active" : ""} onClick={() => setSelectedTopic(topic)}><i style={{ background: topicColor(topic, index) }} />{topic}</button>)}</div></div>
-        <div className="full-map"><InterestMap data={mapData} /></div>
-      </Panel>
-      <div className="workspace-three-column"><MovementMini title="Rising" items={dashboard.evolution.rising.map((i) => i.topic)} icon={<TrendingUp size={16} />} tone="positive" /><MovementMini title="Fading" items={dashboard.evolution.fading.map((i) => i.topic)} icon={<TrendingDown size={16} />} tone="muted" /><MovementMini title="Emerging" items={dashboard.evolution.emerging.map((i) => i.topic)} icon={<Sparkles size={16} />} tone="warm" /></div>
+      <ViewIntro
+        eyebrow="Spatial index / interest map"
+        title="Where your attention lives."
+        description="Nearby points share a semantic neighborhood. Explore your attention clusters and interactive constellations."
+        action={
+          <button className="workspace-action" onClick={() => onOpenView("history")}>
+            <History size={15} /> Browse events
+          </button>
+        }
+      />
+      <div className="mt-4">
+        <InterestMap data={interestMap} />
+      </div>
+      <div className="workspace-three-column mt-6">
+        <MovementMini
+          title="Rising"
+          items={(dashboard.evolution?.rising || []).map((i) => i.topic)}
+          icon={<TrendingUp size={16} />}
+          tone="positive"
+        />
+        <MovementMini
+          title="Fading"
+          items={(dashboard.evolution?.fading || []).map((i) => i.topic)}
+          icon={<TrendingDown size={16} />}
+          tone="muted"
+        />
+        <MovementMini
+          title="Emerging"
+          items={(dashboard.evolution?.emerging || []).map((i) => i.topic)}
+          icon={<Sparkles size={16} />}
+          tone="warm"
+        />
+      </div>
     </>
   );
 }
 
 export function EvolutionView({ dashboard, onOpenView }: WorkspaceProps) {
   const chartData = Object.entries(dashboard.evolution.monthly_drift).map(([month, drift]) => ({ month, drift }));
-  const momentumByTopic = dashboard.evolution.momentum;
-  const momentum = Object.entries(momentumByTopic).flatMap(([topic, values]) => Object.entries(values).map(([month, value]) => ({ topic, month, value })));
-  const topicMomentum = [...new Set(momentum.map((item) => item.topic))].slice(0, 5);
+  const momentumByTopic = dashboard.evolution?.momentum || {};
+  const momentumEntries = useMemo(() => {
+    const entries: { topic: string; value: number }[] = [];
+    for (const [topic, val] of Object.entries(momentumByTopic)) {
+      if (typeof val === "number") {
+        entries.push({ topic, value: val });
+      } else if (val && typeof val === "object") {
+        const subVals = Object.values(val as Record<string, number>);
+        const latestVal = subVals.length ? subVals[subVals.length - 1] : 0;
+        entries.push({ topic, value: latestVal });
+      }
+    }
+    return entries.sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+  }, [momentumByTopic]);
+
   return (
     <>
       <ViewIntro eyebrow="Temporal signal / evolution" title="Your interests are in motion." description="Trace the moments when one curiosity gave way to another." action={<button className="workspace-action" onClick={() => onOpenView("map")}><MapIcon size={15} /> See the map</button>} />
       <InterestEvolution monthlyProportions={dashboard.evolution.monthly_proportions} />
-      <Panel className="chart-panel mt-6"><div className="panel-heading"><div><span className="workspace-eyebrow">Monthly movement</span><h2>Interest drift</h2></div><strong className="panel-stat">{dashboard.overview.current_drift.toFixed(3)}</strong></div><div className="large-chart">{chartData.length ? <ResponsiveContainer width="100%" height="100%"><AreaChart data={chartData}><defs><linearGradient id="workspaceDrift" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#f2b56b" stopOpacity={0.34} /><stop offset="100%" stopColor="#f2b56b" stopOpacity={0} /></linearGradient></defs><CartesianGrid vertical={false} stroke="rgba(255,255,255,0.07)" /><XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fill: "rgba(255,255,255,.4)", fontSize: 11 }} /><YAxis tickLine={false} axisLine={false} tick={{ fill: "rgba(255,255,255,.4)", fontSize: 11 }} /><Tooltip contentStyle={{ background: "#151512", border: "1px solid rgba(255,255,255,.12)", borderRadius: 8, color: "#fff" }} /><Area type="monotone" dataKey="drift" stroke="#f2b56b" fill="url(#workspaceDrift)" strokeWidth={2} /></AreaChart></ResponsiveContainer> : <Empty message="Import more history to see change over time." />}</div></Panel>
-      <div className="workspace-two-column mt-6"><Panel><div className="panel-heading"><div><span className="workspace-eyebrow">Momentum</span><h2>Fastest-moving topics</h2></div><Activity size={16} /></div><div className="momentum-list">{topicMomentum.map((topic, index) => { const values = momentum.filter((item) => item.topic === topic); const latest = values[values.length - 1]?.value || 0; return <div className="momentum-row" key={topic}><i style={{ background: topicColor(topic, index) }} /><span>{topic}</span><strong className={latest >= 0 ? "positive" : "negative"}>{latest >= 0 ? "+" : ""}{latest.toFixed(2)}</strong></div>; })}</div></Panel><Panel><div className="panel-heading"><div><span className="workspace-eyebrow">Direction</span><h2>What is changing</h2></div><CalendarDays size={16} /></div><div className="direction-stack"><DirectionRow label="Rising" items={dashboard.evolution.rising.map((i) => i.topic)} icon={<ArrowUpRight size={15} />} /><DirectionRow label="Fading" items={dashboard.evolution.fading.map((i) => i.topic)} icon={<ArrowDownRight size={15} />} /><DirectionRow label="Emerging" items={dashboard.evolution.emerging.map((i) => i.topic)} icon={<Sparkles size={15} />} /></div></Panel></div>
+      <Panel className="chart-panel mt-6"><div className="panel-heading"><div><span className="workspace-eyebrow">Movement</span><h2>Interest drift</h2></div><strong className="panel-stat">{dashboard.overview.current_drift.toFixed(3)}</strong></div><div className="large-chart">{chartData.length ? <ResponsiveContainer width="100%" height="100%"><AreaChart data={chartData}><defs><linearGradient id="workspaceDrift" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#f2b56b" stopOpacity={0.34} /><stop offset="100%" stopColor="#f2b56b" stopOpacity={0} /></linearGradient></defs><CartesianGrid vertical={false} stroke="rgba(255,255,255,0.07)" /><XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fill: "rgba(255,255,255,.4)", fontSize: 11 }} /><YAxis tickLine={false} axisLine={false} tick={{ fill: "rgba(255,255,255,.4)", fontSize: 11 }} /><Tooltip contentStyle={{ background: "#151512", border: "1px solid rgba(255,255,255,.12)", borderRadius: 8, color: "#fff" }} /><Area type="monotone" dataKey="drift" stroke="#f2b56b" fill="url(#workspaceDrift)" strokeWidth={2} /></AreaChart></ResponsiveContainer> : <Empty message="Import more history to see change over time." />}</div></Panel>
+      <div className="workspace-two-column mt-6"><Panel><div className="panel-heading"><div><span className="workspace-eyebrow">Momentum</span><h2>Fastest-moving topics</h2></div><Activity size={16} /></div><div className="momentum-list">{momentumEntries.slice(0, 6).map((item, index) => <div className="momentum-row" key={item.topic}><i style={{ background: topicColor(item.topic, index) }} /><span>{item.topic}</span><strong className={item.value >= 0 ? "positive" : "negative"}>{item.value >= 0 ? "+" : ""}{item.value.toFixed(2)}</strong></div>)}{!momentumEntries.length && <Empty message="No topic momentum changes recorded yet." />}</div></Panel><Panel><div className="panel-heading"><div><span className="workspace-eyebrow">Direction</span><h2>What is changing</h2></div><CalendarDays size={16} /></div><div className="direction-stack"><DirectionRow label="Rising" items={dashboard.evolution.rising.map((i) => i.topic)} icon={<ArrowUpRight size={15} />} /><DirectionRow label="Fading" items={dashboard.evolution.fading.map((i) => i.topic)} icon={<ArrowDownRight size={15} />} /><DirectionRow label="Emerging" items={dashboard.evolution.emerging.map((i) => i.topic)} icon={<Sparkles size={15} />} /></div></Panel></div>
     </>
   );
 }

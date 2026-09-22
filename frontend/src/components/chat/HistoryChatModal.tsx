@@ -136,12 +136,35 @@ export default function HistoryChatModal({
 
   function renderContent(content: string) {
     return content.split("\n").map((line, idx) => {
-      let html = line
-        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-        .replace(/\*(.*?)\*/g, "<em>$1</em>")
-        .replace(/`(.*?)`/g, '<code class="bg-white/10 px-1 rounded text-amber-200 font-mono text-[10px]">$1</code>');
+      const trimmed = line.trim();
+      if (!trimmed) {
+        return <div key={idx} className="h-1.5" />;
+      }
+
+      let isBullet = false;
+      let displayLine = line;
+
+      if (trimmed.startsWith("• ") || trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+        isBullet = true;
+        displayLine = trimmed.slice(2);
+      }
+
+      let html = displayLine
+        .replace(/\*\*(.*?)\*\*/g, "<strong class='text-white font-semibold'>$1</strong>")
+        .replace(/\*(.*?)\*/g, "<em class='text-amber-200/90 not-italic'>$1</em>")
+        .replace(/`(.*?)`/g, '<code class="bg-white/10 px-1.5 py-0.5 rounded text-amber-200 font-mono text-[10px]">$1</code>');
+
+      if (isBullet) {
+        return (
+          <div key={idx} className="flex items-start gap-2 my-0.5 pl-1">
+            <span className="text-amber-400/80 font-bold select-none leading-relaxed">•</span>
+            <span className="flex-1 leading-relaxed" dangerouslySetInnerHTML={{ __html: html }} />
+          </div>
+        );
+      }
+
       return (
-        <span key={idx} className="block" dangerouslySetInnerHTML={{ __html: html }} />
+        <div key={idx} className="leading-relaxed" dangerouslySetInnerHTML={{ __html: html }} />
       );
     });
   }

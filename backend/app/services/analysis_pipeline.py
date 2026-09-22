@@ -244,6 +244,7 @@ def run_analysis_pipeline(
     topic_labels = generate_topic_labels(
         texts,
         assignments,
+        embeddings=embeddings,
     )
 
     # =========================================================
@@ -319,7 +320,8 @@ def run_analysis_pipeline(
     )
 
     momentum = calculate_momentum(
-        monthly_proportions
+        monthly_proportions,
+        assignment_rows,
     )
 
     rising = detect_rising_topics(
@@ -331,11 +333,13 @@ def run_analysis_pipeline(
     )
 
     emerging = detect_emerging_topics(
-        monthly_proportions
+        monthly_proportions,
+        assignment_rows,
     )
 
     monthly_drift = calculate_monthly_drift(
-        monthly_proportions
+        monthly_proportions,
+        assignment_rows,
     )
 
     # =========================================================

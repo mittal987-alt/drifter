@@ -1,3 +1,4 @@
+from sklearn.decomposition import PCA
 import numpy as np
 import umap
 
@@ -9,28 +10,48 @@ def create_interest_map(
     """
     Convert high-dimensional embeddings
     into 2D coordinates for visualization.
+    Supports small datasets (1 to 5+ items) smoothly without UMAP/Scipy spectral crashes.
     """
+    n_samples = len(embeddings)
 
-    if len(embeddings) < 3:
+    if n_samples == 0:
         return {
             "points": [],
             "topic_centers": [],
         }
 
-    reducer = umap.UMAP(
-        n_components=2,
-        n_neighbors=min(
-            15,
-            len(embeddings) - 1
-        ),
-        min_dist=0.1,
-        metric="cosine",
-        random_state=42,
-    )
+    emb_array = np.asarray(embeddings)
 
-    coordinates = reducer.fit_transform(
-        np.asarray(embeddings)
-    )
+    if n_samples == 1:
+        coordinates = np.array([[0.0, 0.0]])
+    elif n_samples == 2:
+        coordinates = np.array([[-0.5, 0.0], [0.5, 0.0]])
+    elif n_samples < 8:
+        try:
+            pca = PCA(n_components=2, random_state=42)
+            coordinates = pca.fit_transform(emb_array)
+        except Exception:
+            # Fallback to circle layout
+            angles = np.linspace(0, 2 * np.pi, n_samples, endpoint=False)
+            coordinates = np.column_stack([np.cos(angles), np.sin(angles)])
+    else:
+        try:
+            reducer = umap.UMAP(
+                n_components=2,
+                n_neighbors=min(15, max(2, n_samples - 1)),
+                min_dist=0.1,
+                metric="cosine",
+                init="random",
+                random_state=42,
+            )
+            coordinates = reducer.fit_transform(emb_array)
+        except Exception:
+            try:
+                pca = PCA(n_components=2, random_state=42)
+                coordinates = pca.fit_transform(emb_array)
+            except Exception:
+                angles = np.linspace(0, 2 * np.pi, n_samples, endpoint=False)
+                coordinates = np.column_stack([np.cos(angles), np.sin(angles)])
 
     result = []
 

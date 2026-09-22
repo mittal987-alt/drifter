@@ -125,84 +125,14 @@ def save_youtube_events(
     user_id: int,
     events: list[dict[str, Any]],
 ) -> tuple[int, int]:
-    """
-    Save normalized YouTube events.
+    from app.api.history import save_history_events
 
-    Returns:
-        imported, duplicates
-    """
-
-    imported = 0
-    duplicates = 0
-
-    for event in events:
-
-        event_hash = create_event_hash(
-            event
-        )
-
-        # -------------------------------------------------
-        # Duplicate check
-        # -------------------------------------------------
-
-        existing = (
-            db.query(HistoryEvent.id)
-            .filter(
-                HistoryEvent.user_id == user_id,
-                HistoryEvent.event_hash == event_hash,
-            )
-            .first()
-        )
-
-        if existing:
-            duplicates += 1
-            continue
-
-        # -------------------------------------------------
-        # Insert event
-        # -------------------------------------------------
-
-        db.add(
-            HistoryEvent(
-                user_id=user_id,
-                timestamp=event["timestamp"],
-                source="youtube",
-                title=event["title"],
-                artist=event.get("artist"),
-                url=event.get("url"),
-                duration=event.get("duration"),
-                event_hash=event_hash,
-                metadata_json=json.dumps(
-                    event.get(
-                        "metadata",
-                        {},
-                    ),
-                    default=str,
-                ),
-            )
-        )
-
-        imported += 1
-
-    db.commit()
-
-    # -----------------------------------------------------
-    # Clear cached analysis
-    # -----------------------------------------------------
-
-    if imported > 0:
-
-        delete_cached_analysis(
-            user_id=user_id,
-            source="youtube",
-        )
-
-        delete_cached_analysis(
-            user_id=user_id,
-            source=None,
-        )
-
-    return imported, duplicates
+    return save_history_events(
+        db=db,
+        user_id=user_id,
+        events=events,
+        source="youtube",
+    )
 
 
 # =========================================================

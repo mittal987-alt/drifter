@@ -1,4 +1,4 @@
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime
 import os
 import re
@@ -8,11 +8,27 @@ from typing import Any
 def _parse_timestamp(ts: Any) -> datetime | None:
     if isinstance(ts, datetime):
         return ts
+    if isinstance(ts, (int, float)):
+        if ts > 1e11:
+            return datetime.utcfromtimestamp(ts / 1000.0)
+        return datetime.utcfromtimestamp(ts)
     if isinstance(ts, str):
+        cleaned = ts.replace("Z", "+00:00").replace("/", "-").strip()
         try:
-            return datetime.fromisoformat(ts.replace("Z", "+00:00")).replace(tzinfo=None)
+            return datetime.fromisoformat(cleaned).replace(tzinfo=None)
         except Exception:
-            return None
+            pass
+        for fmt in (
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d %H:%M",
+            "%Y-%m-%d",
+            "%d-%m-%Y %H:%M:%S",
+            "%d-%m-%Y",
+        ):
+            try:
+                return datetime.strptime(cleaned.split("+")[0].strip(), fmt)
+            except Exception:
+                continue
     return None
 
 
@@ -23,23 +39,43 @@ def answer_history_chat(
     analysis: dict[str, Any],
 ) -> dict[str, Any]:
     """
-    Synthesize an intelligent response to natural language queries about the user's
-    history, topic shifts, rabbit holes, and listening/watching habits.
+    Synthesize an intelligent, comprehensive response to natural language queries
+    about the user's history, topic shifts, rabbit holes, obsessions, and media habits.
     """
     q_lower = question.lower().strip()
     total_events = len(events)
 
-    top_topics = []
+    # Extract topic distributions
+    topic_counts = Counter()
     assignments = analysis.get("assignments") or events
-    if assignments:
-        counts = Counter(e.get("topic", "Other") for e in assignments)
-        top_topics = [t for t, _ in counts.most_common(5)]
+    for e in assignments:
+        t = e.get("topic", "Other")
+        if t not in ("Other", "Unassigned", "Unknown"):
+            topic_counts[t] += 1
+        elif not topic_counts:
+            topic_counts[t] += 1
+
+    top_topics = [t for t, _ in topic_counts.most_common(8)]
+    dominant_topic = top_topics[0] if top_topics else "General Exploration"
 
     evolution = analysis.get("evolution", {})
     behavior = analysis.get("behavior", {})
-    rising = [item.get("topic") for item in evolution.get("rising", []) if isinstance(item, dict)]
-    fading = [item.get("topic") for item in evolution.get("fading", []) if isinstance(item, dict)]
-    emerging = [item.get("topic") for item in evolution.get("emerging", []) if isinstance(item, dict)]
+
+    rising = [
+        item.get("topic")
+        for item in evolution.get("rising", [])
+        if isinstance(item, dict) and item.get("topic") not in ("Other", "Unassigned", "Unknown")
+    ]
+    fading = [
+        item.get("topic")
+        for item in evolution.get("fading", [])
+        if isinstance(item, dict) and item.get("topic") not in ("Other", "Unassigned", "Unknown")
+    ]
+    emerging = [
+        item.get("topic")
+        for item in evolution.get("emerging", [])
+        if isinstance(item, dict) and item.get("topic") not in ("Other", "Unassigned", "Unknown")
+    ]
     rabbit_holes = behavior.get("rabbit_holes", [])
     time_of_day = behavior.get("time_of_day", {})
 
@@ -51,15 +87,16 @@ def answer_history_chat(
         try:
             return _call_external_llm(question, chat_history, events, analysis, openai_key, gemini_key)
         except Exception:
-            # Fall back to local synthesis engine
             pass
 
     return _synthesize_local_response(
         q_lower=q_lower,
         question=question,
-        events=events,
+        events=assignments,
         analysis=analysis,
+        topic_counts=topic_counts,
         top_topics=top_topics,
+        dominant_topic=dominant_topic,
         rising=rising,
         fading=fading,
         emerging=emerging,
@@ -151,7 +188,9 @@ def _synthesize_local_response(
     question: str,
     events: list[dict[str, Any]],
     analysis: dict[str, Any],
+    topic_counts: Counter,
     top_topics: list[str],
+    dominant_topic: str,
     rising: list[str],
     fading: list[str],
     emerging: list[str],
@@ -161,7 +200,11 @@ def _synthesize_local_response(
     total = len(events)
     if total == 0:
         return {
-            "reply": "I don't see any imported history events yet. Once you connect YouTube or Spotify, or import an archive, I can analyze every obsession, drift, and rabbit hole for you!",
+            "reply": (
+                "I don't see any recorded history traces yet.\n\n"
+                "Once you connect your YouTube or Spotify accounts, or upload an archive file, "
+                "I will analyze your interest clusters, drift velocity, and listening patterns!"
+            ),
             "suggested_queries": [
                 "How do I import history?",
                 "What can Drifter tell me?",
@@ -169,213 +212,206 @@ def _synthesize_local_response(
             "referenced_topics": [],
         }
 
-    # 1. Rabbit holes / binging query
-    if any(k in q_lower for k in ["rabbit hole", "binge", "deep dive", "late night", "midnight", "obsess"]):
-        if rabbit_holes:
-            first_hole = rabbit_holes[0]
-            hole_topic = first_hole.get("topic") or first_hole.get("name") or "various topics"
-            count = first_hole.get("event_count") or first_hole.get("count") or "multiple"
-            reply = (
-                f"You have fallen into **{len(rabbit_holes)} distinct rabbit holes** in this period. "
-                f"Your most intense exploration loop centered on **{hole_topic}** with over {count} consecutive events in a tight session window. "
-                f"Late-night activity shows high curiosity spikes during the **{_get_peak_period(time_of_day)}** hours."
-            )
-        else:
-            reply = (
-                f"Your consumption is relatively dispersed across your top topics ({', '.join(top_topics[:3]) if top_topics else 'various'}), "
-                f"meaning you browse across themes rather than getting stuck in long single-track rabbit holes."
-            )
+    # ------------------------------------------------------------
+    # 1. BIGGEST OBSESSION / TOP INTEREST / CENTER OF GRAVITY
+    # ------------------------------------------------------------
+    if any(k in q_lower for k in ["biggest obsession", "obsession", "obsessed", "favorite", "main interest", "top topic", "center of gravity", "most watched", "most played"]):
+        dom_count = topic_counts.get(dominant_topic, 0)
+        dom_pct = round((dom_count / max(total, 1)) * 100)
+
+        # Get matching top traces
+        matching_titles = [
+            e.get("title", "")
+            for e in events
+            if e.get("topic") == dominant_topic and e.get("title")
+        ]
+
+        reply = (
+            f"Your absolute biggest obsession is **{dominant_topic}**!\n\n"
+            f"• **Dominance**: Accounts for **{dom_count}** of your {total} traces (**{dom_pct}%** of all recorded activity).\n"
+        )
+        if matching_titles:
+            sample = list(dict.fromkeys(matching_titles))[:3]
+            reply += f"• **Key Highlights**:\n"
+            for t in sample:
+                reply += f"  - *{t}*\n"
+
+        if len(top_topics) > 1:
+            reply += f"\nYour runner-up curiosities are **{', '.join(top_topics[1:4])}**."
+
         return {
             "reply": reply,
             "suggested_queries": [
                 "What topics are rising right now?",
-                "Which interests are fading away?",
-                "What are my active hours?",
+                "Show my late-night rabbit holes",
+                "Predict what I'll explore next",
             ],
-            "referenced_topics": top_topics[:2],
+            "referenced_topics": top_topics[:3],
         }
 
-    # 2. Rising / emerging / growing interests
-    if any(k in q_lower for k in ["rising", "growing", "new", "emerging", "spike", "gaining", "trending"]):
-        if rising or emerging:
-            items = rising or emerging
+    # ------------------------------------------------------------
+    # 2. LATE-NIGHT / RABBIT HOLES / BINGING
+    # ------------------------------------------------------------
+    if any(k in q_lower for k in ["rabbit hole", "binge", "deep dive", "late night", "midnight", "night"]):
+        # Find night events (11 PM - 5 AM)
+        night_events = []
+        for e in events:
+            ts = _parse_timestamp(e.get("timestamp"))
+            if ts and (ts.hour >= 23 or ts.hour < 5):
+                night_events.append(e)
+
+        night_topics = Counter(e.get("topic", "Other") for e in night_events if e.get("topic") not in ("Other", "Unassigned", "Unknown"))
+        top_night = [t for t, _ in night_topics.most_common(3)]
+
+        if rabbit_holes:
+            first_hole = rabbit_holes[0]
+            hole_topic = first_hole.get("topic") or first_hole.get("dominant_topic") or first_hole.get("name") or "various topics"
+            count = first_hole.get("event_count") or first_hole.get("count") or "multiple"
+            duration = f" spanning ~{round(float(first_hole.get('duration_minutes', 30)))}m" if first_hole.get("duration_minutes") else ""
             reply = (
-                f"Your fastest accelerating interest right now is **{items[0]}**! "
-                + (f"Other notable rising topics include **{', '.join(items[1:4])}**. " if len(items) > 1 else "")
-                + f"Over the recent period, this cluster has seen a marked uptick in watch and listen frequency."
+                f"You have fallen into **{len(rabbit_holes)} distinct rabbit holes** in your recorded history.\n\n"
+                f"• **Deepest Session**: Centered on **{hole_topic}** with **{count} consecutive events**{duration}.\n"
+                + (f"• **Late-Night Traces**: You logged **{len(night_events)} traces** between 11 PM and 5 AM, favoring *{', '.join(top_night)}*." if night_events else "")
+            )
+        elif night_events:
+            reply = (
+                f"You have **{len(night_events)} late-night traces** logged between 11:00 PM and 5:00 AM.\n\n"
+                f"• **Nocturnal Focus**: Your midnight curiosity centers mostly on **{top_night[0] if top_night else dominant_topic}**"
+                + (f" and *{top_night[1]}*" if len(top_night) > 1 else "")
+                + f".\n• While you explore at night, your sessions are focused rather than sprawling multi-hour loops."
             )
         else:
-            dominant = top_topics[0] if top_topics else "your primary topic"
-            reply = f"Your attention distribution is currently stable around **{dominant}**, with consistent engagement across historical periods."
+            reply = (
+                f"Your activity is well-balanced throughout standard daytime hours, with minimal nocturnal binge sessions. "
+                f"Your attention remains steady around **{dominant_topic}**."
+            )
+
+        return {
+            "reply": reply,
+            "suggested_queries": [
+                "What was my biggest obsession?",
+                "What topics are rising right now?",
+                "What hours am I most active?",
+            ],
+            "referenced_topics": (top_night or top_topics)[:2],
+        }
+
+    # ------------------------------------------------------------
+    # 3. RISING / EMERGING / NEW DIRECTIONS
+    # ------------------------------------------------------------
+    if any(k in q_lower for k in ["rising", "growing", "new direction", "emerging", "spike", "trending", "gaining"]):
+        candidates = rising or emerging or [t for t in top_topics if t != dominant_topic]
+
+        if candidates:
+            fastest = candidates[0]
+            reply = (
+                f"Your fastest growing curiosity right now is **{fastest}**!\n\n"
+            )
+            if emerging and fastest in emerging:
+                reply += f"• **Status**: Newly emerging interest cluster detected in your recent activity.\n"
+            else:
+                reply += f"• **Status**: Accelerating velocity in your recent timeline.\n"
+
+            if len(candidates) > 1:
+                reply += f"• **Other Rising Directions**: {', '.join(f'**{c}**' for c in candidates[1:4])}.\n"
+
+            reply += f"\nYour attention is actively pivoting toward these themes compared to previous periods."
+        else:
+            reply = f"Your attention distribution is currently focused around **{dominant_topic}**, with steady recurrence across recent history."
+
         return {
             "reply": reply,
             "suggested_queries": [
                 "What interests am I losing touch with?",
                 "Predict what I will explore next",
-                "Show my topic transition patterns",
+                "What was my biggest obsession?",
             ],
-            "referenced_topics": (rising + emerging)[:3] or top_topics[:2],
+            "referenced_topics": (candidates or top_topics)[:3],
         }
 
-    # 3. Fading / declining interests
-    if any(k in q_lower for k in ["fading", "losing", "declining", "drop", "less", "stopped"]):
+    # ------------------------------------------------------------
+    # 4. FADING / DECLINING INTERESTS
+    # ------------------------------------------------------------
+    if any(k in q_lower for k in ["fading", "losing", "declining", "drop", "less", "stopped", "cooled"]):
         if fading:
             reply = (
-                f"You are spending noticeably less time with **{fading[0]}** compared to prior months. "
-                + (f"Other fading areas include **{', '.join(fading[1:3])}**. " if len(fading) > 1 else "")
-                + "This is a classic signature of drift: attention shifting toward newer curiosities."
+                f"You are spending noticeably less time with **{fading[0]}** compared to earlier periods.\n\n"
+                + (f"• **Other Cool-Down Areas**: {', '.join(f'*{f}*' for f in fading[1:3])}.\n" if len(fading) > 1 else "")
+                + "This represents a natural drift as your attention makes room for newer curiosities."
             )
         else:
-            reply = "None of your primary topics show a severe decline yet—your core interests are still maintaining steady recurrence."
+            reply = "None of your core interests show a steep decline yet—your exploration profile is maintaining continuous engagement across discovered topics."
+
         return {
             "reply": reply,
             "suggested_queries": [
-                "What are my rising interests?",
-                "Show my dominant center of gravity",
-                "What's my drift score?",
+                "What topics are rising right now?",
+                "What was my biggest obsession?",
+                "What is my drift velocity?",
             ],
             "referenced_topics": fading[:3] or top_topics[:2],
         }
 
-    # 4. Weekday vs Weekend Comparison
-    if any(k in q_lower for k in ["weekend", "weekday", "saturday", "sunday", "workday", "days of week", "day of week"]):
-        day_of_week = behavior.get("day_of_week", {})
-        weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-        weekends = ["Saturday", "Sunday"]
-        weekday_counts = Counter()
-        weekend_counts = Counter()
-        for d, topics in day_of_week.items():
-            target = weekend_counts if d in weekends else weekday_counts
-            if isinstance(topics, dict):
-                for top, cnt in topics.items():
-                    if top != "Other":
-                        target[top] += cnt if isinstance(cnt, int) else 1
-
-        total_wd = sum(weekday_counts.values())
-        total_we = sum(weekend_counts.values())
-        top_wd = weekday_counts.most_common(2)
-        top_we = weekend_counts.most_common(2)
-        wd_str = f"**{top_wd[0][0]}**" if top_wd else "focused learning"
-        we_str = f"**{top_we[0][0]}**" if top_we else "exploratory media"
-        pct_we = round((total_we / max(total_wd + total_we, 1)) * 100)
-        reply = (
-            f"Your attention shifts distinctly between the workweek and the weekend:\n\n"
-            f"• **Weekdays ({total_wd:,} traces)**: Your primary concentration gravitates towards {wd_str}"
-            + (f" and *{top_wd[1][0]}*." if len(top_wd) > 1 else ".")
-            + f"\n• **Weekends ({total_we:,} traces)**: Your curiosity pivots towards {we_str}"
-            + (f" and *{top_we[1][0]}*." if len(top_we) > 1 else ".")
-            + f"\n\nYou log approximately {pct_we}% of your overall activity on Saturdays and Sundays."
-        )
-        return {
-            "reply": reply,
-            "suggested_queries": [
-                "What was my biggest rabbit hole?",
-                "What hours am I most active?",
-                "Predict what I will explore next",
-            ],
-            "referenced_topics": [t[0] for t in (top_wd + top_we)[:3]],
-        }
-
-    # 5. Cross-Platform / Audio vs Video Synergy
-    if any(k in q_lower for k in ["spotify", "youtube", "cross platform", "audio", "music vs video", "listening vs watching", "synergy"]):
-        yt_count = sum(1 for e in events if str(e.get("source", "")).lower() == "youtube")
-        sp_count = sum(1 for e in events if str(e.get("source", "")).lower() == "spotify")
-        if yt_count > 0 and sp_count > 0:
-            reply = (
-                f"Your digital traces span both **YouTube** ({yt_count:,} events) and **Spotify** ({sp_count:,} events).\n\n"
-                f"• **Video Exploration**: Drives your visual and educational deep-dives, centering on {top_topics[0] if top_topics else 'various topics'}.\n"
-                f"• **Audio Stream**: Sustains rhythmic background focus and late-night auditory immersion.\n"
-                f"• **Synergy**: The two platforms frequently overlap in complementary windows, reflecting synchronized multi-modal attention."
-            )
-        elif sp_count > 0:
-            reply = f"Your logged traces currently center on **Spotify** ({sp_count:,} tracks recorded), highlighting your sonic obsessions and artist fidelity."
-        else:
-            reply = f"Your traces are currently driven by **YouTube** ({yt_count:,} video traces). Connect Spotify via OAuth to discover cross-platform video and audio synergies!"
-        return {
-            "reply": reply,
-            "suggested_queries": [
-                "Show my late night rabbit holes",
-                "What topics are rising right now?",
-                "How do my weekdays compare to weekends?",
-            ],
-            "referenced_topics": top_topics[:2],
-        }
-
-    # 6. Future Predictions & Recommendations
-    if any(k in q_lower for k in ["predict", "next", "future", "what will i explore", "recommend", "horizon", "forecast"]):
+    # ------------------------------------------------------------
+    # 5. PREDICTIONS / FUTURE HORIZON
+    # ------------------------------------------------------------
+    if any(k in q_lower for k in ["predict", "next", "future", "what will i", "recommend", "forecast", "horizon"]):
         from app.prediction.next_interest import predict_next_interests
         preds_data = predict_next_interests(assignments=events, analysis=analysis)
         preds = preds_data.get("predictions", [])
         if preds:
             top_p = preds[0]
             reply = (
-                f"Based on your Markov transition pathways and interest momentum, your most probable next obsession is **{top_p['topic']}** "
-                f"({top_p['confidence']}% projected confidence, {top_p['horizon'].lower()}).\n\n"
-                f"**Rationale**: {top_p['rationale']}\n\n"
-                f"Recommended starter seeds:\n"
+                f"Based on your Markov transition graph and momentum velocity, your highest-probability next curiosity is **{top_p['topic']}** "
+                f"({top_p['confidence']}% confidence · {top_p['horizon']}).\n\n"
+                f"**Why**: {top_p['rationale']}\n\n"
+                f"**Suggested Starter Queries**:\n"
             )
             for seed in top_p.get("seed_keywords", [])[:3]:
                 reply += f"• *{seed}*\n"
             if len(preds) > 1:
-                reply += f"\nSecondary horizon prediction: **{preds[1]['topic']}** ({preds[1]['confidence']}% confidence)."
+                reply += f"\nSecondary projected path: **{preds[1]['topic']}** ({preds[1]['confidence']}% confidence)."
             return {
                 "reply": reply,
                 "suggested_queries": [
                     f"How has {top_p['topic']} trended recently?",
                     "What are my rising interests?",
-                    "Show my topic transitions",
+                    "What was my biggest obsession?",
                 ],
                 "referenced_topics": [p["topic"] for p in preds[:3]],
             }
 
-    # 7. Drift Velocity & Timeline Trajectory
-    if any(k in q_lower for k in ["drift", "velocity", "trajectory", "change over time", "evolution", "shift"]):
+    # ------------------------------------------------------------
+    # 6. DRIFT / EVOLUTION / CHANGE OVER TIME
+    # ------------------------------------------------------------
+    if any(k in q_lower for k in ["drift", "velocity", "trajectory", "change over time", "evolution", "shift", "movement"]):
         monthly_drift = evolution.get("monthly_drift", {})
-        if monthly_drift:
-            months = list(monthly_drift.keys())
-            latest_month = months[-1]
-            latest_val = float(monthly_drift[latest_month])
-            speed = "rapid acceleration" if latest_val > 0.4 else ("moderate steady transition" if latest_val > 0.2 else "high thematic stability")
-            reply = (
-                f"Your attention drift is in **{speed}** with a monthly drift score of **{latest_val:.3f}** in {latest_month}.\n\n"
-                f"• **Rising curiosities**: {', '.join(rising[:3]) if rising else 'Thematic stability'}\n"
-                f"• **Fading themes**: {', '.join(fading[:3]) if fading else 'No steep declines'}\n\n"
-                f"Your attention horizon has evolved smoothly across historical periods, opening new curiosity branches."
-            )
-        else:
-            reply = f"Your attention velocity is currently measured across {len(top_topics)} active clusters, maintaining a balanced interest topology."
+        drift_vals = [float(v) for v in monthly_drift.values() if isinstance(v, (int, float))]
+        latest_val = drift_vals[-1] if drift_vals else analysis.get("overview", {}).get("current_drift", 0.0)
+
+        speed = "rapid acceleration" if latest_val > 0.5 else ("active shifting" if latest_val > 0.25 else "thematic stability")
+        reply = (
+            f"Your attention drift is currently showing **{speed}** with a measured drift score of **{latest_val:.3f}**.\n\n"
+            f"• **Center of Gravity**: {dominant_topic}\n"
+            f"• **Rising**: {', '.join(rising[:2]) if rising else 'Stable focus'}\n"
+            f"• **Fading**: {', '.join(fading[:2]) if fading else 'No steep drop-offs'}\n\n"
+            f"This score measures how much your attention topology has migrated away from your early baseline."
+        )
         return {
             "reply": reply,
             "suggested_queries": [
-                "What is rising right now?",
-                "Which interests are fading?",
+                "What was my biggest obsession?",
+                "What topics are rising right now?",
                 "Predict what I will explore next",
             ],
-            "referenced_topics": (rising + fading)[:3] or top_topics[:2],
+            "referenced_topics": (rising + fading)[:2] or top_topics[:2],
         }
 
-    # 8. Time / Hours / Routine
-    if any(k in q_lower for k in ["time", "hour", "morning", "night", "when", "day", "routine", "schedule"]):
-        peak = _get_peak_period(time_of_day)
-        reply = (
-            f"Your curiosity is most active during the **{peak}**. "
-            f"Here is how your attention splits across the day:\n"
-        )
-        for period, count in sorted(time_of_day.items(), key=lambda x: -_extract_num(x[1]))[:4]:
-            reply += f"- **{period.title()}**: {count if isinstance(count, int) else 'Active'}\n"
-        return {
-            "reply": reply,
-            "suggested_queries": [
-                "What was my biggest rabbit hole?",
-                "What is my attention archetype?",
-                "Show my YouTube vs Spotify habits",
-            ],
-            "referenced_topics": top_topics[:2],
-        }
-
-    # 5. Specific search or topic query in events
+    # ------------------------------------------------------------
+    # 7. SPECIFIC SEARCH IN EVENT TITLES / ARTISTS / TOPICS
+    # ------------------------------------------------------------
+    tokens = [w for w in re.findall(r"\b\w{3,}\b", q_lower) if w not in ["what", "when", "where", "which", "about", "show", "tell", "have", "been", "with", "this", "that", "does", "your", "from"]]
     matched_events = []
-    tokens = [w for w in re.findall(r"\b\w{3,}\b", q_lower) if w not in ["what", "when", "where", "which", "about", "show", "tell", "have", "been", "with", "this", "that"]]
     if tokens:
         for ev in reversed(events):
             text = f"{ev.get('title', '')} {ev.get('artist', '')} {ev.get('topic', '')}".lower()
@@ -387,33 +423,41 @@ def _synthesize_local_response(
     if matched_events:
         reply = f"I found **{len(matched_events)} matching traces** in your history:\n\n"
         for ev in matched_events[:4]:
-            t = ev.get("title", "Untitled")
+            t = ev.get("title", "Untitled activity")
             top = ev.get("topic", "General")
-            date_str = str(ev.get("timestamp", ""))[:10]
-            reply += f"• **{t}** — *{top}* ({date_str})\n"
+            ts = str(ev.get("timestamp", ""))[:10]
+            reply += f"• **{t}** — *{top}* ({ts})\n"
+
+        matched_topics = list(set(e.get("topic") for e in matched_events if e.get("topic") not in ("Other", "Unassigned", "Unknown")))
         return {
             "reply": reply,
             "suggested_queries": [
-                f"How has {matched_events[0].get('topic')} evolved over time?",
-                "What are my all-time top topics?",
-                "Show my interest predictions",
+                f"What is my biggest obsession?",
+                "What topics are rising right now?",
+                "Predict what I will explore next",
             ],
-            "referenced_topics": list(set(e.get("topic") for e in matched_events if e.get("topic"))),
+            "referenced_topics": matched_topics[:3] or top_topics[:2],
         }
 
-    # Default summary answer
-    dominant = top_topics[0] if top_topics else "Various interests"
+    # ------------------------------------------------------------
+    # DEFAULT COMPREHENSIVE OVERVIEW
+    # ------------------------------------------------------------
+    dom_count = topic_counts.get(dominant_topic, 0)
+    dom_pct = round((dom_count / max(total, 1)) * 100)
+
     reply = (
-        f"Across your **{total:,} recorded traces**, your primary center of gravity is **{dominant}**, "
-        + (f"followed closely by **{', '.join(top_topics[1:4])}**. " if len(top_topics) > 1 else "")
-        + f"Your interest graph indicates an evolving attention network with {len(top_topics)} distinct topic neighborhoods."
+        f"Across your **{total:,} recorded traces**, your primary attention anchor is **{dominant_topic}** ({dom_pct}% of activity).\n\n"
+        + (f"• **Active Topic Clusters**: {', '.join(f'**{t}**' for t in top_topics[:4])}\n" if len(top_topics) > 1 else "")
+        + (f"• **Emerging / Rising**: {', '.join(rising or emerging)}\n" if (rising or emerging) else "")
+        + f"• **Peak Activity**: Most active during **{_get_peak_period(time_of_day)}**.\n\n"
+        f"Ask me about any specific topic, rabbit hole, or curiosity shift!"
     )
     return {
         "reply": reply,
         "suggested_queries": [
+            "What was my biggest obsession?",
+            "Show my late-night rabbit holes",
             "What topics are rising right now?",
-            "What was my deepest rabbit hole?",
-            "Predict what I will drift into next",
         ],
         "referenced_topics": top_topics[:3],
     }
@@ -429,7 +473,7 @@ def _get_peak_period(time_of_day: dict[str, Any]) -> str:
         if val > best_val:
             best_val = val
             best_period = p
-    return best_period
+    return best_period.title()
 
 
 def _extract_num(v: Any) -> int:
@@ -438,3 +482,4 @@ def _extract_num(v: Any) -> int:
     if isinstance(v, dict):
         return sum(_extract_num(x) for x in v.values())
     return 1
+

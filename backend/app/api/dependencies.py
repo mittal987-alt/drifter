@@ -1,6 +1,6 @@
 import hashlib
 import hmac
-from fastapi import Request
+from fastapi import HTTPException, Request
 
 from app.config import settings
 from app.database.database import SessionLocal
@@ -50,8 +50,7 @@ def get_current_user_id(
     request: Request,
 ) -> int:
     """
-    Get current user ID from Authorization header, X-Sync-Token header, or session.
-    If no valid session/token exists, automatically creates/uses a default user account.
+    Get the current user ID from an extension token or authenticated session.
     """
     # 1. Check Bearer token / X-Sync-Token header
     auth_header = request.headers.get("authorization") or request.headers.get("x-sync-token")
@@ -63,9 +62,6 @@ def get_current_user_id(
                 user = db.query(User).filter(User.id == token_user_id).first()
                 if user:
                     return int(user.id)
-                primary_user = db.query(User).order_by(User.id.asc()).first()
-                if primary_user:
-                    return int(primary_user.id)
             finally:
                 db.close()
 
@@ -79,15 +75,9 @@ def get_current_user_id(
             if user:
                 return int(user.id)
 
-        # Always fallback to the primary (lowest id) user containing all imported history
-        primary_user = db.query(User).order_by(User.id.asc()).first()
-        if not primary_user:
-            primary_user = User()
-            db.add(primary_user)
-            db.commit()
-            db.refresh(primary_user)
-
-        request.session["user_id"] = primary_user.id
-        return int(primary_user.id)
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated",
+        )
     finally:
         db.close()
