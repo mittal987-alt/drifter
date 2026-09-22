@@ -36,13 +36,13 @@ export default function CorrelationView() {
   }
 
   // Filter pairings by search query
-  const filteredCorrelations = data?.correlations.filter((pair) => {
+  const filteredCorrelations = data?.correlations?.filter((pair) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
-      pair.video_topic.toLowerCase().includes(q) ||
-      pair.audio_tag.toLowerCase().includes(q) ||
-      pair.synergy_type.toLowerCase().includes(q)
+      (pair.video_topic || "").toLowerCase().includes(q) ||
+      (pair.audio_tag || "").toLowerCase().includes(q) ||
+      (pair.synergy_type || "").toLowerCase().includes(q)
     );
   }) || [];
 

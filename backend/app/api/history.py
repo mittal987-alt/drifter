@@ -43,10 +43,10 @@ def save_history_events(
     imported = 0
     duplicates = 0
 
-    # Fetch existing event hashes to avoid UNIQUE constraint collisions
+    # Fetch existing event hashes for this user to avoid duplicate entries
     existing_hashes = {
         row[0]
-        for row in db.query(HistoryEvent.event_hash).all()
+        for row in db.query(HistoryEvent.event_hash).filter(HistoryEvent.user_id == user_id).all()
         if row[0]
     }
 

@@ -260,13 +260,138 @@ export function EvolutionView({ dashboard, onOpenView }: WorkspaceProps) {
 
 
 export function BehaviorView({ dashboard, onOpenView }: WorkspaceProps) {
-  const behavior = dashboard.behavior;
-  const timeRows = Object.entries(behavior.time_of_day).sort(([, a], [, b]) => b - a);
+  const behavior = dashboard?.behavior || {
+    time_of_day: {},
+    day_of_week: {},
+    topic_transitions: [],
+    rabbit_holes: [],
+    interest_concentration: {},
+  };
+
+  const concentration = (behavior.interest_concentration || {}) as Record<string, any>;
+  const concentrationVal = concentration.dominant_share
+    ? `${(concentration.dominant_share * 100).toFixed(0)}%`
+    : concentration.topic_count
+    ? `${concentration.topic_count} topics`
+    : "0%";
+
+  // Parse time_of_day properly
+  const timeEntries = Object.entries(behavior.time_of_day || {}).map(([period, topicMap]) => {
+    let count = 0;
+    let topTopic = "";
+    if (typeof topicMap === "number") {
+      count = topicMap;
+    } else if (topicMap && typeof topicMap === "object") {
+      const entries = Object.entries(topicMap as Record<string, number>);
+      count = entries.reduce((s, [, c]) => s + c, 0);
+      if (entries.length > 0) {
+        entries.sort((a, b) => b[1] - a[1]);
+        topTopic = entries[0][0];
+      }
+    }
+    return { period, count, topTopic };
+  });
+
+  const maxCount = Math.max(...timeEntries.map((t) => t.count), 1);
+  const timeRows = timeEntries.sort((a, b) => b.count - a.count);
+
   return (
     <>
-      <ViewIntro eyebrow="Behavioral signal / patterns" title="How you explore." description="Your habits are part of the map too: loops, transitions, and the hours when curiosity is most active." action={<button className="workspace-action" onClick={() => onOpenView("history")}><History size={15} /> Inspect history</button>} />
-      <div className="signal-grid"><div className="signal-card"><span className="signal-label">Rabbit holes</span><strong>{behavior.rabbit_holes.length}</strong><p>Deep sessions where one thread kept pulling you onward.</p></div><div className="signal-card"><span className="signal-label">Topic transitions</span><strong>{behavior.topic_transitions.length}</strong><p>Moves between different interest neighborhoods.</p></div><div className="signal-card"><span className="signal-label">Concentration</span><strong>{Object.keys(behavior.interest_concentration).length}</strong><p>Measured dimensions of how focused your activity is.</p></div></div>
-      <div className="workspace-two-column"><Panel><div className="panel-heading"><div><span className="workspace-eyebrow">When it happens</span><h2>Active hours</h2></div><Clock3 size={16} /></div><div className="bar-list">{timeRows.map(([label, value], index) => <div className="bar-row" key={label}><span>{label}</span><div><i style={{ width: `${Math.min(100, value * 100)}%`, background: topicColor(label, index) }} /></div><strong>{typeof value === "number" ? value.toFixed(2) : value}</strong></div>)}{!timeRows.length && <Empty message="No time pattern yet." />}</div></Panel><Panel><div className="panel-heading"><div><span className="workspace-eyebrow">Behavioral loops</span><h2>Rabbit holes</h2></div><GitBranch size={16} /></div><div className="trace-list">{(behavior.rabbit_holes as Array<Record<string, unknown>>).slice(0, 8).map((hole, index) => <div className="trace-row" key={index}><span className="trace-number">{index + 1}</span><div><strong>{String(hole.topic || hole.name || "Exploration loop")}</strong><span>{Object.entries(hole).slice(0, 2).map(([key, value]) => `${key}: ${String(value)}`).join(" · ")}</span></div></div>)}{!behavior.rabbit_holes.length && <Empty message="No rabbit holes detected yet." />}</div></Panel></div>
+      <ViewIntro
+        eyebrow="Behavioral signal / patterns"
+        title="How you explore."
+        description="Your habits are part of the map too: loops, transitions, and the hours when curiosity is most active."
+        action={
+          <button className="workspace-action" onClick={() => onOpenView("history")}>
+            <History size={15} /> Inspect history
+          </button>
+        }
+      />
+      <div className="signal-grid">
+        <div className="signal-card">
+          <span className="signal-label">Rabbit holes</span>
+          <strong>{behavior.rabbit_holes?.length || 0}</strong>
+          <p>Deep sessions where one thread kept pulling you onward.</p>
+        </div>
+        <div className="signal-card">
+          <span className="signal-label">Topic transitions</span>
+          <strong>{behavior.topic_transitions?.length || 0}</strong>
+          <p>Moves between different interest neighborhoods.</p>
+        </div>
+        <div className="signal-card">
+          <span className="signal-label">Concentration</span>
+          <strong>{concentrationVal}</strong>
+          <p>
+            {concentration.dominant_topic
+              ? `Main focus: ${concentration.dominant_topic}`
+              : "Measured focus of your activity."}
+          </p>
+        </div>
+      </div>
+      <div className="workspace-two-column">
+        <Panel>
+          <div className="panel-heading">
+            <div>
+              <span className="workspace-eyebrow">When it happens</span>
+              <h2>Active hours</h2>
+            </div>
+            <Clock3 size={16} />
+          </div>
+          <div className="bar-list">
+            {timeRows.filter((r) => r.count > 0).map((row, index) => (
+              <div className="bar-row" key={row.period}>
+                <span className="capitalize">{row.period}</span>
+                <div>
+                  <i
+                    style={{
+                      width: `${Math.min(100, (row.count / maxCount) * 100)}%`,
+                      background: topicColor(row.period, index),
+                    }}
+                  />
+                </div>
+                <strong>
+                  {row.count} {row.count === 1 ? "event" : "events"}
+                  {row.topTopic ? ` (${row.topTopic})` : ""}
+                </strong>
+              </div>
+            ))}
+            {!timeRows.some((r) => r.count > 0) && <Empty message="No time pattern yet." />}
+          </div>
+        </Panel>
+        <Panel>
+          <div className="panel-heading">
+            <div>
+              <span className="workspace-eyebrow">Behavioral loops</span>
+              <h2>Rabbit holes</h2>
+            </div>
+            <GitBranch size={16} />
+          </div>
+          <div className="trace-list">
+            {(behavior.rabbit_holes as Array<Record<string, unknown>> || []).slice(0, 8).map((hole, index) => {
+              const domTopic = String(hole.dominant_topic || hole.topic || hole.name || "Exploration loop");
+              const evCount = hole.event_count || hole.count || "";
+              const duration = hole.duration_minutes ? `${Math.round(Number(hole.duration_minutes))}m` : "";
+              return (
+                <div className="trace-row" key={index}>
+                  <span className="trace-number">{index + 1}</span>
+                  <div>
+                    <strong>{domTopic}</strong>
+                    <span>
+                      {[
+                        evCount ? `${evCount} events` : null,
+                        duration ? `${duration} session` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+            {!behavior.rabbit_holes?.length && <Empty message="No rabbit holes detected yet." />}
+          </div>
+        </Panel>
+      </div>
     </>
   );
 }

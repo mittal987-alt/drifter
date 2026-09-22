@@ -58,7 +58,16 @@ def get_current_user_id(
     if auth_header:
         token_user_id = verify_extension_token(auth_header)
         if token_user_id:
-            return token_user_id
+            db = SessionLocal()
+            try:
+                user = db.query(User).filter(User.id == token_user_id).first()
+                if user:
+                    return int(user.id)
+                primary_user = db.query(User).order_by(User.id.asc()).first()
+                if primary_user:
+                    return int(primary_user.id)
+            finally:
+                db.close()
 
     # 2. Check session
     user_id = request.session.get("user_id")
@@ -70,15 +79,15 @@ def get_current_user_id(
             if user:
                 return int(user.id)
 
-        # Create or fetch first user if not found — always use the primary (lowest id) user
-        guest_user = db.query(User).order_by(User.id.asc()).first()
-        if not guest_user:
-            guest_user = User()
-            db.add(guest_user)
+        # Always fallback to the primary (lowest id) user containing all imported history
+        primary_user = db.query(User).order_by(User.id.asc()).first()
+        if not primary_user:
+            primary_user = User()
+            db.add(primary_user)
             db.commit()
-            db.refresh(guest_user)
+            db.refresh(primary_user)
 
-        request.session["user_id"] = guest_user.id
-        return int(guest_user.id)
+        request.session["user_id"] = primary_user.id
+        return int(primary_user.id)
     finally:
         db.close()

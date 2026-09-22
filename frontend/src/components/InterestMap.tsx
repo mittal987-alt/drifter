@@ -102,51 +102,35 @@ export default function InterestMap({
   data,
 }: Props) {
 
-  const points =
-    data.points as InterestPoint[];
+  const points = (data?.points || []) as InterestPoint[];
 
-
-  if (!points.length) {
-
+  if (!points || !points.length) {
     return (
-      <div className="empty-map">
-
-        <div>
-          Not enough data to create
-          an interest map.
+      <div className="empty-map flex flex-col items-center justify-center h-full text-center p-6 text-neutral-400">
+        <div className="font-semibold text-neutral-200 mb-1">
+          Not enough data to create an interest map.
         </div>
-
-        <small>
-          Import more history events
-          to generate the map.
+        <small className="text-xs text-neutral-500">
+          Import history events or use the YouTube Extension to sync your watch history.
         </small>
-
       </div>
     );
   }
-
 
   const grouped: Record<
     string,
     InterestPoint[]
   > = {};
 
-
   for (const point of points) {
-
-    const topic =
-      point.topic || "Unknown";
-
+    const topic = point.topic || "Unknown";
     if (!grouped[topic]) {
       grouped[topic] = [];
     }
-
     grouped[topic].push(point);
   }
 
-
-  const topics =
-    Object.keys(grouped);
+  const topics = Object.keys(grouped);
 
 
   return (

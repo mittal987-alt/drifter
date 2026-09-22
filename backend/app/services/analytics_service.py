@@ -72,22 +72,27 @@ def save_analysis(
     source: str | None = None,
 ) -> AnalysisResult:
 
-    event_count = len(
-        analysis.get("events", [])
-    )
+    assignments = analysis.get("assignments") or analysis.get("events") or []
+    event_count = len(assignments) if isinstance(assignments, list) else 0
 
-    existing = (
+    query = (
         db.query(AnalysisResult)
         .filter(
             AnalysisResult.user_id == user_id,
-            AnalysisResult.source == source,
         )
-        .first()
     )
+    if source is None:
+        query = query.filter(AnalysisResult.source.is_(None))
+    else:
+        query = query.filter(AnalysisResult.source == source)
+
+    existing = query.first()
 
     if existing:
 
         existing.event_count = event_count
+        existing.status = "READY"
+        existing.error = None
 
         existing.analysis_json = json.dumps(
             analysis,

@@ -81,27 +81,6 @@ def analyze_interests(
         )
 
     # ========================================================
-    # CACHE
-    # ========================================================
-
-    if not refresh:
-
-        cached = get_cached_analysis(
-            user_id=user_id,
-            source=source,
-        )
-
-        if cached:
-
-            return {
-                **cached["analysis"],
-                "cached": True,
-                "cache_updated_at": (
-                    cached["updated_at"]
-                ),
-            }
-
-    # ========================================================
     # LOAD EVENTS
     # ========================================================
 
@@ -145,6 +124,27 @@ def analyze_interests(
             **build_interest_analysis([]),
             "cached": False,
         }
+
+    # ========================================================
+    # CACHE CHECK
+    # ========================================================
+
+    if not refresh:
+
+        cached = get_cached_analysis(
+            user_id=user_id,
+            source=source,
+        )
+
+        if cached and cached.get("event_count") == len(events) and cached.get("analysis"):
+
+            return {
+                **cached["analysis"],
+                "cached": True,
+                "cache_updated_at": (
+                    cached["updated_at"]
+                ),
+            }
 
     # ========================================================
     # ANALYZE
@@ -196,29 +196,6 @@ def get_dashboard(
         )
 
     # ========================================================
-    # CHECK CACHE
-    # ========================================================
-
-    if not refresh:
-
-        cached = get_cached_analysis(
-            user_id=user_id,
-            source=source,
-        )
-
-        if cached:
-            analysis = cached["analysis"]
-            assignments = analysis.get("assignments", [])
-            # If all assignments are labeled "Other", bypass cache to re-analyze with categorization
-            if assignments and all(a.get("topic") == "Other" for a in assignments if isinstance(a, dict)):
-                cached = None
-            else:
-                return build_dashboard_response(
-                    analysis,
-                    cached=True,
-                )
-
-    # ========================================================
     # LOAD EVENTS
     # ========================================================
 
@@ -258,6 +235,27 @@ def get_dashboard(
             build_interest_analysis([]),
             cached=False,
         )
+
+    # ========================================================
+    # CHECK CACHE
+    # ========================================================
+
+    if not refresh:
+
+        cached = get_cached_analysis(
+            user_id=user_id,
+            source=source,
+        )
+
+        if cached and cached.get("event_count") == len(events) and cached.get("analysis"):
+            analysis = cached["analysis"]
+            assignments = analysis.get("assignments", [])
+            # If all assignments are labeled "Other", bypass cache to re-analyze with categorization
+            if not (assignments and all(a.get("topic") == "Other" for a in assignments if isinstance(a, dict))):
+                return build_dashboard_response(
+                    analysis,
+                    cached=True,
+                )
 
     # ========================================================
     # RUN ANALYSIS
@@ -576,24 +574,26 @@ def build_dashboard_response(
 # ============================================================
 
 def _load_user_analysis_and_events(user_id: int, source: str | None = None) -> tuple[dict, list]:
-    cached = get_cached_analysis(user_id=user_id, source=source)
-    if cached and cached.get("analysis"):
-        analysis = cached["analysis"]
-        assignments = analysis.get("assignments") or analysis.get("events") or []
-        return analysis, assignments
-
     db = SessionLocal()
     try:
         query = db.query(HistoryEvent).filter(HistoryEvent.user_id == user_id).order_by(HistoryEvent.timestamp.asc())
         if source:
             query = query.filter(HistoryEvent.source == source)
         events = query.limit(2500).all()
+        db_count = len(events)
     finally:
         db.close()
 
     if not events:
         empty_analysis = build_interest_analysis([])
         return empty_analysis, []
+
+    cached = get_cached_analysis(user_id=user_id, source=source)
+    if cached and cached.get("analysis") and cached.get("event_count") == db_count:
+        analysis = cached["analysis"]
+        assignments = analysis.get("assignments") or analysis.get("events") or []
+        if assignments:
+            return analysis, assignments
 
     analysis = build_interest_analysis(events)
     save_analysis(user_id=user_id, source=source, event_count=len(events), analysis=analysis)

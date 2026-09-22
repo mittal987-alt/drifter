@@ -10,9 +10,10 @@
     "scripting"
   ],
   "host_permissions": [
-    "https://www.youtube.com/*",
-    "http://127.0.0.1:8000/*",
-    "http://localhost:8000/*"
+    "https://*.youtube.com/*",
+    "https://youtube.com/*",
+    "http://127.0.0.1:*/*",
+    "http://localhost:*/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -20,7 +21,8 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.youtube.com/watch*"
+        "https://www.youtube.com/*",
+        "https://*.youtube.com/*"
       ],
       "js": [
         "content.js"

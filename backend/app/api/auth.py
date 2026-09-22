@@ -134,6 +134,7 @@ def register(
     request: Request,
     db: Session = Depends(get_db),
 ):
+    from sqlalchemy import text as sql_text
     email = payload.email.strip().lower()
     if not email or "@" not in email or "." not in email:
         raise HTTPException(status_code=400, detail="Invalid email address.")
@@ -145,27 +146,48 @@ def register(
     if existing:
         raise HTTPException(status_code=400, detail="An account with this email already exists.")
 
-    new_user = User(
-        email=email,
-        password_hash=hash_password(payload.password),
-        name=payload.name.strip() if payload.name else None,
+    # -------------------------------------------------------
+    # Smart guest-claim: if there is exactly ONE guest user
+    # (no email, no password hash) with history events, upgrade
+    # that user in-place so no data is lost.
+    # -------------------------------------------------------
+    guest_user = (
+        db.query(User)
+        .filter(User.email == None, User.password_hash == None)  # noqa: E711
+        .first()
     )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    if guest_user:
+        guest_user.email = email
+        guest_user.password_hash = hash_password(payload.password)
+        guest_user.name = payload.name.strip() if payload.name else None
+        db.commit()
+        db.refresh(guest_user)
+        target_user = guest_user
+        msg = "Account created and linked to your existing history."
+    else:
+        new_user = User(
+            email=email,
+            password_hash=hash_password(payload.password),
+            name=payload.name.strip() if payload.name else None,
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        target_user = new_user
+        msg = "Account created successfully."
 
-    request.session["user_id"] = new_user.id
-    sync_token = generate_extension_token(new_user.id)
+    request.session["user_id"] = target_user.id
+    sync_token = generate_extension_token(target_user.id)
 
     return {
         "authenticated": True,
         "user": {
-            "id": new_user.id,
-            "email": new_user.email,
-            "name": new_user.name,
+            "id": target_user.id,
+            "email": target_user.email,
+            "name": target_user.name,
         },
         "sync_token": sync_token,
-        "message": "Account created successfully.",
+        "message": msg,
     }
 
 

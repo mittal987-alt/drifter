@@ -782,24 +782,24 @@ function App() {
 
     let cancelled = false;
 
-    async function loadHistory() {
+    async function loadHistory(showLoader = true) {
       try {
-        setHistoryLoading(true);
+        if (showLoader) setHistoryLoading(true);
         const events = await getHistory();
         if (!cancelled) setHistory(events);
       } catch {
-        if (!cancelled) setHistory([]);
+        if (!cancelled && showLoader) setHistory([]);
       } finally {
-        if (!cancelled) setHistoryLoading(false);
+        if (!cancelled && showLoader) setHistoryLoading(false);
       }
     }
 
-    loadHistory();
+    loadHistory(true);
 
-    // Poll every 30 seconds so extension-synced videos show up automatically
+    // Poll every 10 seconds so extension-synced videos show up promptly
     const intervalId = window.setInterval(() => {
-      if (!cancelled) loadHistory();
-    }, 30_000);
+      if (!cancelled) loadHistory(false);
+    }, 10_000);
 
     return () => {
       cancelled = true;

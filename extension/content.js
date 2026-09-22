@@ -8,6 +8,14 @@
 
   function getVideoId() {
     try {
+      if (window.location.pathname.startsWith("/shorts/")) {
+        const parts = window.location.pathname.split("/shorts/")[1];
+        return parts ? parts.split(/[?&#/]/)[0] : null;
+      }
+      if (window.location.pathname.startsWith("/live/")) {
+        const parts = window.location.pathname.split("/live/")[1];
+        return parts ? parts.split(/[?&#/]/)[0] : null;
+      }
       const params = new URLSearchParams(window.location.search);
       return params.get("v");
     } catch (e) {
@@ -20,19 +28,19 @@
     let title = "";
     let channel = "";
 
-    // YouTube DOM Selectors
+    // Comprehensive YouTube DOM Selectors (Standard, Shorts, Redesigns)
     const titleEl = document.querySelector(
-      "h1.ytd-watch-metadata yt-formatted-string, #title h1, h1.title"
+      "h1.ytd-watch-metadata yt-formatted-string, #title h1, h1.title, .ytd-video-primary-info-renderer h1, yt-formatted-string.ytd-watch-metadata, #container > h1 > yt-formatted-string, ytd-reel-player-header-renderer .title, h2.reel-player-header-title, yt-formatted-string.ytd-reel-player-header-renderer"
     );
     if (titleEl) {
       title = titleEl.textContent.trim();
     }
     if (!title && document.title) {
-      title = document.title.replace("- YouTube", "").trim();
+      title = document.title.replace("- YouTube", "").replace(/^\(\d+\)\s*/, "").trim();
     }
 
     const channelEl = document.querySelector(
-      "ytd-channel-name #text, #owner-name #text, .ytd-channel-name a"
+      "ytd-watch-metadata #channel-name #text, ytd-channel-name #text, #owner-name #text, .ytd-channel-name a, #channel-name yt-formatted-string, ytd-reel-channel-bar-renderer #channel-name yt-formatted-string"
     );
     if (channelEl) {
       channel = channelEl.textContent.trim();
@@ -40,8 +48,8 @@
 
     return {
       videoId: videoId || "",
-      title: title || "YouTube Video",
-      channel: channel || "YouTube Channel",
+      title: title || (videoId ? `YouTube Video (${videoId})` : "YouTube Video"),
+      channel: channel || "YouTube",
       url: window.location.href,
     };
   }
@@ -59,10 +67,11 @@
   function checkWatchThreshold(durationSeconds) {
     if (isLoggedForCurrentVideo || !currentVideoId) return;
 
-    // Threshold: 20 seconds OR 10% of video duration (min 5s)
-    const minThreshold = durationSeconds
-      ? Math.min(20, Math.max(5, durationSeconds * 0.1))
-      : 20;
+    const dur = Number.isFinite(durationSeconds) && durationSeconds > 0 ? durationSeconds : null;
+    // Threshold: 15 seconds OR 10% of video duration (min 5s, max 15s)
+    const minThreshold = dur
+      ? Math.min(15, Math.max(5, dur * 0.1))
+      : 10;
 
     if (accumWatchTime >= minThreshold) {
       isLoggedForCurrentVideo = true;
@@ -74,7 +83,7 @@
         channel: meta.channel,
         url: meta.url,
         watchedSeconds: Math.round(accumWatchTime),
-        durationSeconds: Math.round(durationSeconds || 0),
+        durationSeconds: Math.round(dur || 0),
         watchedAt: new Date().toISOString(),
       };
 
@@ -123,10 +132,18 @@
     });
   }
 
-  // Observe SPA page navigation on YouTube (yt-navigate-finish)
+  // Observe SPA page navigation on YouTube
   window.addEventListener("yt-navigate-finish", () => {
     resetTracker();
-    setTimeout(attachVideoListeners, 1000);
+    setTimeout(attachVideoListeners, 500);
+  });
+  window.addEventListener("yt-page-data-updated", () => {
+    resetTracker();
+    setTimeout(attachVideoListeners, 500);
+  });
+  window.addEventListener("popstate", () => {
+    resetTracker();
+    setTimeout(attachVideoListeners, 500);
   });
 
   // Initial setup and polling for dynamic video element
@@ -136,5 +153,11 @@
   const observer = new MutationObserver(() => {
     attachVideoListeners();
   });
-  observer.observe(document.body, { childList: true, subtree: true });
+  if (document.body) {
+    observer.observe(document.body, { childList: true, subtree: true });
+  } else {
+    document.addEventListener("DOMContentLoaded", () => {
+      observer.observe(document.body, { childList: true, subtree: true });
+    });
+  }
 })();

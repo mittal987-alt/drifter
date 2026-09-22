@@ -22,16 +22,13 @@ interface InterestEvolutionProps {
 export default function InterestEvolution({
   monthlyProportions,
 }: InterestEvolutionProps) {
-  const months = Object.keys(
-    monthlyProportions,
-  ).sort();
+  const safeProportions = monthlyProportions || {};
+  const months = Object.keys(safeProportions).sort();
 
   const topics = Array.from(
     new Set(
       months.flatMap((month) =>
-        Object.keys(
-          monthlyProportions[month],
-        ),
+        Object.keys(safeProportions[month] || {})
       ),
     ),
   );
@@ -47,7 +44,7 @@ export default function InterestEvolution({
 
       for (const topic of topics) {
         row[topic] =
-          monthlyProportions[
+          safeProportions[
             month
           ]?.[topic] ?? 0;
       }

@@ -39,18 +39,19 @@ export function getTopicColor(topic: string, index = 0): string {
 }
 
 export default function TopicDistribution({
-  topics,
+  topics = [],
 }: TopicDistributionProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
-  const totalCount = topics.reduce((acc, curr) => acc + curr.count, 0);
+  const safeTopics = Array.isArray(topics) ? topics : [];
+  const totalCount = safeTopics.reduce((acc, curr) => acc + (curr?.count || 0), 0);
 
-  const data = topics.map((item, idx) => {
+  const data = safeTopics.map((item, idx) => {
     const share = item.share ?? (totalCount > 0 ? (item.count / totalCount) * 100 : 0);
-    const color = getTopicColor(item.topic, idx);
+    const color = getTopicColor(item.topic || "Unknown", idx);
     return {
-      name: item.topic,
-      value: item.count,
+      name: item.topic || "Unknown",
+      value: item.count || 0,
       share: Number(share.toFixed(1)),
       color,
     };
