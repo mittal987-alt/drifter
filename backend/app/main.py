@@ -13,6 +13,8 @@ from app.api.history import router as history_router
 from app.api.analytics import router as analytics_router
 from app.api.google_history import router as google_history_router
 from app.api.history_extension_api import router as history_extension_router
+from app.api.github_api import router as github_router
+from app.api.reddit_api import router as reddit_router
 
 # Database
 from sqlalchemy import inspect, text
@@ -176,6 +178,18 @@ app.include_router(
 
 app.include_router(google_history_router)
 app.include_router(history_extension_router)
+
+app.include_router(
+    github_router,
+    prefix="/api/github",
+    tags=["GitHub"],
+)
+
+app.include_router(
+    reddit_router,
+    prefix="/api/reddit",
+    tags=["Reddit"],
+)
 
 
 # ============================================================

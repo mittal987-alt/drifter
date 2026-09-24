@@ -171,6 +171,197 @@ def normalize_spotify_event(item: dict):
 
 
 # --------------------------------------------------
+# GitHub
+# --------------------------------------------------
+
+def normalize_github_event(item: dict):
+    if not isinstance(item, dict):
+        return None
+
+    timestamp = parse_timestamp(
+        item.get("created_at")
+        or item.get("starred_at")
+        or item.get("timestamp")
+        or item.get("updated_at")
+    )
+    if not timestamp:
+        timestamp = datetime.utcnow()
+
+    title = (
+        item.get("full_name")
+        or item.get("name")
+        or (item.get("repo", {}).get("name") if isinstance(item.get("repo"), dict) else None)
+        or item.get("title")
+        or ""
+    )
+    if not title:
+        return None
+
+    desc = item.get("description") or item.get("language") or ""
+    if desc:
+        title = f"{title} ({desc})"
+
+    url = item.get("html_url") or item.get("url") or f"https://github.com/{title.split(' ')[0]}"
+
+    return {
+        "timestamp": timestamp,
+        "source": "github",
+        "title": title,
+        "artist": item.get("language") or item.get("owner", {}).get("login") if isinstance(item.get("owner"), dict) else None,
+        "url": url,
+        "duration": None,
+        "metadata": item,
+    }
+
+
+# --------------------------------------------------
+# Netflix
+# --------------------------------------------------
+
+def normalize_netflix_event(item: dict):
+    if not isinstance(item, dict):
+        return None
+
+    timestamp = parse_timestamp(
+        item.get("Date")
+        or item.get("date")
+        or item.get("timestamp")
+        or item.get("Start Time")
+        or item.get("startTime")
+    )
+    if not timestamp:
+        timestamp = datetime.utcnow()
+
+    title = (
+        item.get("Title")
+        or item.get("title")
+        or item.get("name")
+        or ""
+    )
+    if not title:
+        return None
+
+    duration = item.get("Duration") or item.get("duration")
+
+    return {
+        "timestamp": timestamp,
+        "source": "netflix",
+        "title": title,
+        "artist": None,
+        "url": None,
+        "duration": duration,
+        "metadata": item,
+    }
+
+
+# --------------------------------------------------
+# Reddit
+# --------------------------------------------------
+
+def normalize_reddit_event(item: dict):
+    if not isinstance(item, dict):
+        return None
+
+    timestamp = parse_timestamp(
+        item.get("date")
+        or item.get("created_utc")
+        or item.get("timestamp")
+    )
+    if not timestamp:
+        timestamp = datetime.utcnow()
+
+    title = (
+        item.get("title")
+        or item.get("body")
+        or item.get("subreddit")
+        or ""
+    )
+    if not title:
+        return None
+
+    sub = item.get("subreddit")
+    if sub and not title.startswith(f"r/{sub}"):
+        title = f"r/{sub}: {title[:120]}"
+
+    url = item.get("permalink") or item.get("url")
+
+    return {
+        "timestamp": timestamp,
+        "source": "reddit",
+        "title": title,
+        "artist": item.get("author") or sub,
+        "url": url,
+        "duration": None,
+        "metadata": item,
+    }
+
+
+# --------------------------------------------------
+# Steam
+# --------------------------------------------------
+
+def normalize_steam_event(item: dict):
+    if not isinstance(item, dict):
+        return None
+
+    timestamp = parse_timestamp(
+        item.get("last_played")
+        or item.get("rtime_last_played")
+        or item.get("timestamp")
+    )
+    if not timestamp:
+        timestamp = datetime.utcnow()
+
+    title = item.get("name") or item.get("title") or ""
+    if not title:
+        return None
+
+    playtime_min = item.get("playtime_forever") or item.get("playtime_2weeks")
+
+    return {
+        "timestamp": timestamp,
+        "source": "steam",
+        "title": title,
+        "artist": None,
+        "url": None,
+        "duration": playtime_min,
+        "metadata": item,
+    }
+
+
+# --------------------------------------------------
+# Browser Web History
+# --------------------------------------------------
+
+def normalize_browser_event(item: dict):
+    if not isinstance(item, dict):
+        return None
+
+    timestamp = parse_timestamp(
+        item.get("visit_time")
+        or item.get("lastVisitTime")
+        or item.get("timestamp")
+        or item.get("time")
+    )
+    if not timestamp:
+        timestamp = datetime.utcnow()
+
+    title = item.get("title") or item.get("url") or ""
+    if not title:
+        return None
+
+    return {
+        "timestamp": timestamp,
+        "source": "browser",
+        "title": title,
+        "artist": None,
+        "url": item.get("url"),
+        "duration": None,
+        "metadata": item,
+    }
+
+
+# --------------------------------------------------
 # Generic normalization
 # --------------------------------------------------
 
@@ -178,18 +369,42 @@ def normalize_event(
     item: dict,
     source: str
 ):
+    src = (source or "youtube").lower()
 
-    if source == "youtube":
-
+    if src == "youtube":
         return normalize_youtube_event(item)
 
-    if source == "spotify":
-
+    if src == "spotify":
         return normalize_spotify_event(item)
 
-    raise ValueError(
-        f"Unsupported source: {source}"
-    )
+    if src == "github":
+        return normalize_github_event(item)
+
+    if src == "netflix":
+        return normalize_netflix_event(item)
+
+    if src == "reddit":
+        return normalize_reddit_event(item)
+
+    if src == "steam":
+        return normalize_steam_event(item)
+
+    if src in ("browser", "chrome", "web"):
+        return normalize_browser_event(item)
+
+    # Fallback to general event normalization
+    title = item.get("title") or item.get("name") or item.get("track")
+    if not title:
+        return None
+    return {
+        "timestamp": parse_timestamp(item.get("timestamp") or item.get("date") or item.get("time")) or datetime.utcnow(),
+        "source": src,
+        "title": str(title),
+        "artist": item.get("artist") or item.get("author"),
+        "url": item.get("url"),
+        "duration": item.get("duration"),
+        "metadata": item,
+    }
 
 
 # --------------------------------------------------

@@ -18,6 +18,12 @@ class Settings:
     SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
     SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 
+    GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
+    GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
+
+    REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")
+    REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET")
+
     FRONTEND_URL = os.getenv(
         "FRONTEND_URL",
         "http://localhost:5173",
@@ -31,6 +37,16 @@ class Settings:
     SPOTIFY_REDIRECT_URI = os.getenv(
         "SPOTIFY_REDIRECT_URI",
         f"{BACKEND_URL}/api/auth/spotify/callback",
+    )
+
+    GITHUB_REDIRECT_URI = os.getenv(
+        "GITHUB_REDIRECT_URI",
+        f"{BACKEND_URL}/api/github/callback",
+    )
+
+    REDDIT_REDIRECT_URI = os.getenv(
+        "REDDIT_REDIRECT_URI",
+        f"{BACKEND_URL}/api/reddit/callback",
     )
 
     DATABASE_URL = os.getenv(

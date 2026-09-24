@@ -85,16 +85,20 @@ import { NumberTicker } from "@/components/ui/number-ticker";
 import { BorderBeam } from "@/components/ui/border-beam";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { AnimatedGradientText } from "@/components/ui/animated-gradient-text";
+import { ShimmerButton } from "@/components/ui/shimmer-button";
+import { Meteors } from "@/components/ui/meteors";
 
 /*
 |--------------------------------------------------------------------------
-| Actual Aceternity UI components
+| Actual Aceternity UI & Motion components
 |--------------------------------------------------------------------------
 */
 
+import { motion } from "motion/react";
 import { Spotlight } from "@/components/ui/spotlight";
 import { CardSpotlight } from "@/components/ui/card-spotlight";
 import { TextGenerateEffect } from "@/components/ui/text-generate-effect";
+
 
 /* ==========================================================================
    APP
@@ -126,7 +130,7 @@ function App() {
     useState(false);
 
   const [importSource, setImportSource] =
-    useState<"youtube" | "spotify">("youtube");
+    useState<"youtube" | "spotify" | "github" | "reddit" | "netflix" | "steam" | "browser">("youtube");
 
   const [importFile, setImportFile] =
     useState<File | null>(null);
@@ -454,10 +458,9 @@ function App() {
         <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0b] shadow-2xl">
 
           <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-5">
-
             <div>
               <p className="text-[10px] font-medium uppercase tracking-[0.25em] text-white/30">
-                Data ingestion
+                Multi-Source Ingestion
               </p>
 
               <h2 className="mt-1 text-lg font-semibold">
@@ -465,9 +468,13 @@ function App() {
               </h2>
 
               <p className="mt-1 text-xs text-white/35">
-                {importSource === "spotify"
-                  ? "Upload your Spotify listening history from Privacy Settings."
-                  : "Upload your YouTube watch history from Google Takeout."}
+                {importSource === "spotify" && "Upload your Spotify listening history JSON or CSV from Privacy Settings."}
+                {importSource === "youtube" && "Upload your YouTube watch history JSON or Google Takeout ZIP."}
+                {importSource === "github" && "Upload your GitHub starred repositories or events JSON."}
+                {importSource === "reddit" && "Upload your Reddit comments or upvoted posts CSV."}
+                {importSource === "netflix" && "Upload your NetflixViewingActivity.csv from Account settings."}
+                {importSource === "steam" && "Upload your Steam games/playtime JSON export."}
+                {importSource === "browser" && "Upload your Chrome/Firefox browsing history JSON or CSV."}
               </p>
             </div>
 
@@ -478,103 +485,74 @@ function App() {
             >
               <X size={18} />
             </button>
-
           </div>
 
           <div className="space-y-6 p-6">
-
-            {/* SOURCE */}
-
+            {/* SOURCE SELECTOR */}
             <div>
               <p className="mb-3 text-xs font-medium text-white/60">
-                History source
+                Select Platform Source
               </p>
 
-              <div className="grid grid-cols-2 gap-3">
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setImportSource("youtube");
-                    setImportError(null);
-                  }}
-                  disabled={importing}
-                  className={`rounded-xl border px-4 py-3 text-left transition ${
-                    importSource === "youtube"
-                      ? "border-white/20 bg-white/[0.08]"
-                      : "border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05]"
-                  } disabled:opacity-50`}
-                >
-                  <div className="text-sm font-medium">
-                    YouTube
-                  </div>
-
-                  <div className="mt-1 text-[11px] text-white/30">
-                    Watch history
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setImportSource("spotify");
-                    setImportError(null);
-                    setImportFile(null);
-                  }}
-                  disabled={importing}
-                  className={`rounded-xl border px-4 py-3 text-left transition ${
-                    importSource === "spotify"
-                      ? "border-white/20 bg-white/[0.08]"
-                      : "border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05]"
-                  } disabled:opacity-50`}
-                >
-                  <div className="text-sm font-medium">
-                    Spotify
-                  </div>
-
-                  <div className="mt-1 text-[11px] text-white/30">
-                    Listening history
-                  </div>
-                </button>
-
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {[
+                  { id: "youtube", label: "YouTube", sub: "Watch history" },
+                  { id: "spotify", label: "Spotify", sub: "Audio & Music" },
+                  { id: "github", label: "GitHub", sub: "Code & Repos" },
+                  { id: "reddit", label: "Reddit", sub: "Discussions" },
+                  { id: "netflix", label: "Netflix", sub: "Viewing CSV" },
+                  { id: "steam", label: "Steam", sub: "Games & Playtime" },
+                  { id: "browser", label: "Browser", sub: "Web History" },
+                ].map((item) => {
+                  const isSelected = importSource === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setImportSource(item.id as any);
+                        setImportError(null);
+                        setImportFile(null);
+                      }}
+                      disabled={importing}
+                      className={`rounded-xl border px-3 py-2.5 text-left transition ${
+                        isSelected
+                          ? "border-white/30 bg-white/[0.1] shadow-[0_0_12px_rgba(255,255,255,0.05)]"
+                          : "border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05]"
+                      } disabled:opacity-50`}
+                    >
+                      <div className="text-xs font-medium text-white">{item.label}</div>
+                      <div className="mt-0.5 text-[10px] text-white/35 truncate">{item.sub}</div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* FILE */}
-
+            {/* FILE DROPZONE */}
             <label
-              className="group flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-6 py-10 text-center transition hover:border-white/20 hover:bg-white/[0.04]"
+              className="group flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-6 py-8 text-center transition hover:border-white/20 hover:bg-white/[0.04]"
             >
-
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] transition group-hover:bg-white/[0.08]">
-                <Upload size={20} />
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] transition group-hover:bg-white/[0.08]">
+                <Upload size={18} />
               </div>
 
               {importFile ? (
                 <>
-                  <p className="mt-4 max-w-full truncate px-4 text-sm font-medium">
+                  <p className="mt-3 max-w-full truncate px-4 text-xs font-medium text-white">
                     {importFile.name}
                   </p>
-
-                  <p className="mt-1 text-xs text-white/30">
-                    {(
-                      importFile.size /
-                      1024 /
-                      1024
-                    ).toFixed(2)}{" "}
-                    MB
+                  <p className="mt-0.5 text-[11px] text-white/40">
+                    {(importFile.size / 1024 / 1024).toFixed(2)} MB
                   </p>
                 </>
               ) : (
                 <>
-                  <p className="mt-4 text-sm font-medium">
-                    Choose history file
+                  <p className="mt-3 text-xs font-medium text-white">
+                    Choose {importSource.toUpperCase()} history file
                   </p>
-
-                  <p className="mt-1 text-xs text-white/30">
-                    {importSource === "spotify"
-                      ? "Spotify JSON or CSV from Privacy Settings"
-                      : "YouTube JSON or Google Takeout ZIP"}
+                  <p className="mt-0.5 text-[11px] text-white/30">
+                    Supports JSON, CSV, or Takeout ZIP
                   </p>
                 </>
               )}
@@ -1384,29 +1362,44 @@ function App() {
 
             </div>
 
-            <button
+            <ShimmerButton
               onClick={() => setWrappedOpen(true)}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-rose-500/10 px-4 text-xs font-semibold text-amber-300 transition hover:border-amber-400 hover:bg-amber-500/20 hover:text-white shadow-lg shadow-amber-500/5"
+              shimmerColor="#f59e0b"
+              shimmerDuration="2.5s"
+              background="rgba(245, 158, 11, 0.08)"
+              className="h-10 border-amber-500/30 px-4 text-xs font-semibold text-amber-300 shadow-lg shadow-amber-500/5 hover:border-amber-400"
             >
-              <Sparkles size={14} className="text-amber-400" />
-              Wrapped Story
-            </button>
+              <span className="flex items-center gap-2">
+                <Sparkles size={14} className="text-amber-400" />
+                <span>Wrapped Story</span>
+              </span>
+            </ShimmerButton>
 
-            <button
+            <ShimmerButton
               onClick={() => setChatOpen(true)}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-purple-500/30 bg-purple-500/10 px-4 text-xs font-medium text-purple-200 transition hover:border-purple-400 hover:bg-purple-500/20 hover:text-white"
+              shimmerColor="#a855f7"
+              shimmerDuration="2.5s"
+              background="rgba(168, 85, 247, 0.08)"
+              className="h-10 border-purple-500/30 px-4 text-xs font-semibold text-purple-200 shadow-lg shadow-purple-500/5 hover:border-purple-400"
             >
-              <Bot size={14} className="text-purple-400" />
-              Ask Drifter
-            </button>
+              <span className="flex items-center gap-2">
+                <Bot size={14} className="text-purple-400" />
+                <span>Ask Drifter</span>
+              </span>
+            </ShimmerButton>
 
-            <button
+            <ShimmerButton
               onClick={() => setExtensionModalOpen(true)}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-purple-500/30 bg-purple-500/10 px-4 text-xs font-semibold text-purple-300 transition hover:border-purple-400 hover:bg-purple-500/20 hover:text-white shadow-lg shadow-purple-500/5"
+              shimmerColor="#8b5cf6"
+              shimmerDuration="3s"
+              background="rgba(139, 92, 246, 0.08)"
+              className="h-10 border-purple-500/30 px-4 text-xs font-semibold text-purple-300 shadow-lg shadow-purple-500/5 hover:border-purple-400"
             >
-              <Puzzle size={14} className="text-purple-400" />
-              Extension Sync
-            </button>
+              <span className="flex items-center gap-2">
+                <Puzzle size={14} className="text-purple-400" />
+                <span>Extension Sync</span>
+              </span>
+            </ShimmerButton>
 
             <button
               onClick={() => setAccountModalOpen(true)}
@@ -1528,6 +1521,14 @@ function App() {
                   setActiveView
                 }
                 onRefresh={() => loadDashboard(true)}
+                onOpenImport={() => {
+                  setImportSource("youtube");
+                  setImportOpen(true);
+                  setImportResult(null);
+                  setImportError(null);
+                }}
+                onOpenExtension={() => setExtensionModalOpen(true)}
+                onConnectSpotify={handleSpotifyConnectClick}
               />
 
 
@@ -1948,10 +1949,11 @@ function App() {
                   <BlurFade delay={0.5}>
 
                     <CardSpotlight
-                      className="min-h-[210px] overflow-hidden"
+                      className="relative min-h-[210px] overflow-hidden"
                       radius={220}
                       color="#262626"
                     >
+                      <Meteors number={8} className="opacity-40" />
 
                       <div className="relative z-10 p-5">
 
@@ -2354,26 +2356,32 @@ function SidebarItem({
   return (
     <button
       onClick={onClick}
+      type="button"
       className={`
-        flex
-        w-full
-        items-center
-        gap-3
-        rounded-xl
-        px-3
-        py-2.5
-        text-left
-        text-xs
-        transition
+        group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-medium transition-colors duration-200 outline-none
         ${
           active
-            ? "bg-white/[0.07] text-white"
-            : "text-white/35 hover:bg-white/[0.04] hover:text-white/70"
+            ? "text-white font-semibold"
+            : "text-white/40 hover:text-white/80 hover:bg-white/[0.03]"
         }
       `}
     >
-      {icon}
-      {label}
+      {active && (
+        <motion.div
+          layoutId="sidebar-active-indicator"
+          className="absolute inset-0 rounded-xl bg-white/[0.08] border border-white/10 shadow-[0_0_12px_rgba(255,255,255,0.05)]"
+          transition={{ type: "spring", stiffness: 350, damping: 30 }}
+        />
+      )}
+      <span className="relative z-10 flex items-center gap-3">
+        <span className={active ? "text-white" : "text-white/40 group-hover:text-white/70 transition-colors"}>
+          {icon}
+        </span>
+        <span>{label}</span>
+      </span>
+      {active && (
+        <span className="relative z-10 ml-auto h-1.5 w-1.5 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+      )}
     </button>
   );
 }
@@ -2395,37 +2403,32 @@ function StatCard({
 }) {
   return (
     <MagicCard
+      className="group relative overflow-hidden transition-transform duration-300 hover:scale-[1.02]"
       gradientColor="#262626"
-      gradientOpacity={0.3}
+      gradientOpacity={0.35}
     >
       <div className="relative p-5">
-
         <div className="flex items-center justify-between">
-
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.07] bg-white/[0.04] text-white/50">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.07] bg-white/[0.04] text-white/50 transition-colors group-hover:border-white/20 group-hover:text-white">
             {icon}
           </div>
 
           <ArrowUpRight
             size={13}
-            className="text-white/15"
+            className="text-white/15 transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-white/60"
           />
-
         </div>
 
-        <p className="mt-5 text-[10px] uppercase tracking-[0.16em] text-white/30">
+        <p className="mt-5 text-[10px] uppercase tracking-[0.16em] text-white/30 group-hover:text-white/50 transition-colors">
           {label}
         </p>
 
-        <div className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
-
+        <div className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl text-white">
           <NumberTicker
             value={value}
             decimalPlaces={decimals}
           />
-
         </div>
-
       </div>
     </MagicCard>
   );
@@ -2507,12 +2510,13 @@ function MovementCard({
 }) {
   return (
     <MagicCard
-      className="min-h-[210px]"
+      className="relative min-h-[210px] overflow-hidden"
       gradientColor="#262626"
       gradientOpacity={0.3}
     >
+      <Meteors number={8} className="opacity-40" />
 
-      <div className="p-5">
+      <div className="relative z-10 p-5">
 
         <div className="flex items-center justify-between">
 
@@ -2546,7 +2550,7 @@ function MovementCard({
 
               <div
                 key={item.topic}
-                className="flex items-center justify-between rounded-lg border border-white/[0.07] bg-white/[0.03] px-3 py-2.5"
+                className="flex items-center justify-between rounded-lg border border-white/[0.07] bg-white/[0.03] px-3 py-2.5 backdrop-blur-sm"
               >
 
                 <span className="min-w-0 truncate text-[11px] text-white/60">

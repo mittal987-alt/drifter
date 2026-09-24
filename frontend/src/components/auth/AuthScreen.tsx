@@ -11,6 +11,11 @@ import {
 } from "lucide-react";
 import { authService } from "@/services/auth";
 import { ConnectionCard } from "./connectionCard";
+import { Spotlight } from "@/components/ui/spotlight";
+import { BorderBeam } from "@/components/ui/border-beam";
+import { AnimatedGradientText } from "@/components/ui/animated-gradient-text";
+import { ShimmerButton } from "@/components/ui/shimmer-button";
+import { TextGenerateEffect } from "@/components/ui/text-generate-effect";
 
 function YouTubeIcon({ className = "h-5 w-5 fill-[#FF0000]" }: { className?: string }) {
   return (
@@ -75,22 +80,21 @@ export function AuthScreen({
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#050505] text-white">
-      {/* Ambient background */}
+      {/* Spotlight & Ambient background */}
+      <Spotlight className="-top-40 left-0 md:left-60 md:-top-20" fill="rgba(168, 85, 247, 0.2)" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(120,119,198,0.15),transparent_40%)]" />
 
       <main className="relative z-10 mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center px-6 py-16">
         {/* Badge */}
-        <div className="mb-6 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-4 py-1.5 text-xs text-white/60">
+        <AnimatedGradientText className="mb-6 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-4 py-1.5 text-xs text-white/70">
           <Sparkles size={13} className="text-amber-400" />
           <span>PERSONAL INTEREST INTELLIGENCE</span>
-        </div>
+        </AnimatedGradientText>
 
         {/* Hero */}
         <div className="text-center max-w-2xl">
-          <h1 className="text-4xl font-semibold tracking-tight sm:text-6xl">
-            Your interests,
-            <br />
-            <span className="text-white/40">evolving.</span>
+          <h1 className="text-4xl font-semibold tracking-tight sm:text-6xl text-white">
+            Your interests, <span className="text-white/40">evolving.</span>
           </h1>
           <p className="mx-auto mt-4 text-sm leading-relaxed text-white/50">
             Drifter maps your personal media evolution and gives you a personal token to import your digital traces from any method you use.
@@ -98,7 +102,8 @@ export function AuthScreen({
         </div>
 
         {/* MANUAL EMAIL/PASSWORD CARD */}
-        <div className="mt-8 w-full max-w-md rounded-3xl border border-white/10 bg-[#0c0c10]/90 backdrop-blur-xl p-6 shadow-2xl space-y-4">
+        <div className="relative mt-8 w-full max-w-md rounded-3xl border border-white/10 bg-[#0c0c10]/90 backdrop-blur-xl p-6 shadow-2xl space-y-4 overflow-hidden">
+          <BorderBeam size={180} duration={8} borderWidth={1.5} colorFrom="#a855f7" colorTo="#f59e0b" />
           {/* Mode Switcher */}
           <div className="flex rounded-2xl border border-white/10 bg-white/[0.03] p-1 text-xs">
             <button
@@ -190,23 +195,27 @@ export function AuthScreen({
               </div>
             </div>
 
-            <button
+            <ShimmerButton
               type="submit"
               disabled={submitting}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black py-3 text-xs font-semibold shadow-lg shadow-amber-500/10 transition disabled:opacity-50 mt-2"
+              shimmerColor="#f59e0b"
+              background="linear-gradient(135deg, #f59e0b, #d97706)"
+              className="w-full text-black py-3 text-xs font-bold shadow-lg shadow-amber-500/20 transition disabled:opacity-50 mt-3"
             >
-              {submitting ? (
-                <>
-                  <RefreshCw size={14} className="animate-spin" />
-                  <span>Authenticating...</span>
-                </>
-              ) : (
-                <>
-                  <span>{mode === "register" ? "Create Account & Get Token" : "Sign In with Email"}</span>
-                  <ArrowRight size={14} />
-                </>
-              )}
-            </button>
+              <span className="flex items-center justify-center gap-2">
+                {submitting ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin text-black" />
+                    <span>Authenticating...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{mode === "register" ? "Create Account & Get Token" : "Sign In with Email"}</span>
+                    <ArrowRight size={14} className="text-black" />
+                  </>
+                )}
+              </span>
+            </ShimmerButton>
           </form>
 
           <p className="text-[11px] text-center text-white/35 pt-1">

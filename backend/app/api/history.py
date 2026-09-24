@@ -1,6 +1,9 @@
 import json
 from datetime import datetime
 
+import httpx
+from pydantic import BaseModel
+
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -194,12 +197,16 @@ async def import_history(
     # Validate source
     # ---------------------------------------------------------
 
-    if source not in ("youtube", "spotify"):
+    SUPPORTED_SOURCES = {
+        "youtube", "spotify", "github", "reddit", "netflix", "steam", "browser"
+    }
+
+    if source not in SUPPORTED_SOURCES:
         raise HTTPException(
             status_code=400,
             detail=(
                 f"Unsupported source '{source}'. "
-                "Only YouTube and Spotify history imports are supported."
+                f"Supported: {', '.join(sorted(SUPPORTED_SOURCES))}."
             ),
         )
 
@@ -277,19 +284,19 @@ async def import_history(
         total_records = len(data)
         events = parse_youtube_history(data)
     else:
-        # Spotify JSON or CSV export
+        # All other sources: Spotify, GitHub, Reddit, Netflix, Steam, Browser
         try:
             events = parse_history_file(
                 content=raw_bytes,
                 filename=file.filename,
-                source="spotify",
+                source=source,
             )
             total_records = len(events)
         except Exception as exc:
-            print(f"[SPOTIFY IMPORT ERROR] File '{file.filename}': {exc}", flush=True)
+            print(f"[{source.upper()} IMPORT ERROR] File '{file.filename}': {exc}", flush=True)
             raise HTTPException(
                 status_code=400,
-                detail=f"Failed to parse Spotify history: {exc}",
+                detail=f"Failed to parse {source.title()} history: {exc}",
             )
 
     valid_records = len(events)
@@ -398,13 +405,13 @@ def get_history_events(
     if source:
         source = source.lower().strip()
 
-        if source not in {
-            "youtube",
-            "spotify",
-        }:
+        SUPPORTED_SOURCES = {
+            "youtube", "spotify", "github", "reddit", "netflix", "steam", "browser"
+        }
+        if source not in SUPPORTED_SOURCES:
             raise HTTPException(
                 status_code=400,
-                detail="Unsupported source.",
+                detail=f"Unsupported source '{source}'.",
             )
 
         query = query.filter(
@@ -485,14 +492,13 @@ def clear_history(
     if source:
         source = source.lower().strip()
 
-        if source not in {
-            "youtube",
-            "spotify",
-            "extension",
-        }:
+        SUPPORTED_SOURCES = {
+            "youtube", "spotify", "github", "reddit", "netflix", "steam", "browser", "extension"
+        }
+        if source not in SUPPORTED_SOURCES:
             raise HTTPException(
                 status_code=400,
-                detail="Unsupported source.",
+                detail=f"Unsupported source '{source}'.",
             )
 
         query = query.filter(
@@ -577,3 +583,102 @@ def delete_history_event(
         "event_id": event_id,
         "message": "Event deleted successfully.",
     }
+
+
+# =============================================================
+# STEAM API KEY SYNC
+# =============================================================
+
+class SteamSyncRequest(BaseModel):
+    api_key: str
+    steam_id: str
+
+
+@router.post("/steam-sync")
+async def steam_sync(
+    body: SteamSyncRequest,
+    background_tasks: BackgroundTasks,
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """
+    Sync Steam game library using a Steam Web API key and Steam ID.
+    No OAuth needed — Steam Web API is public.
+    """
+    api_key = body.api_key.strip()
+    steam_id = body.steam_id.strip()
+
+    if not api_key or not steam_id:
+        raise HTTPException(status_code=400, detail="Both api_key and steam_id are required.")
+
+    steam_url = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/"
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.get(steam_url, params={
+                "key": api_key,
+                "steamid": steam_id,
+                "include_appinfo": 1,
+                "include_played_free_games": 1,
+                "format": "json",
+            })
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 403:
+            raise HTTPException(
+                status_code=403,
+                detail="Invalid Steam API key or Steam profile is private. Make sure your profile's game details are public.",
+            )
+        raise HTTPException(status_code=400, detail=f"Steam API error: {exc}")
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Failed to contact Steam API: {exc}")
+
+    games = (data.get("response") or {}).get("games") or []
+    if not games:
+        raise HTTPException(
+            status_code=404,
+            detail="No games found. Check your Steam ID and make sure your profile is public.",
+        )
+
+    events = []
+    for game in games:
+        name = game.get("name") or f"App {game.get('appid', 'unknown')}"
+        playtime_min = game.get("playtime_forever") or 0
+        rtime = game.get("rtime_last_played") or 0
+        if rtime:
+            try:
+                ts = datetime.utcfromtimestamp(rtime)
+            except Exception:
+                ts = datetime.utcnow()
+        else:
+            ts = datetime.utcnow()
+
+        events.append({
+            "timestamp": ts,
+            "source": "steam",
+            "title": name,
+            "artist": None,
+            "url": f"https://store.steampowered.com/app/{game.get('appid', '')}",
+            "duration": float(playtime_min) if playtime_min else None,
+            "metadata": game,
+        })
+
+    imported, duplicates = save_history_events(
+        db=db,
+        user_id=user_id,
+        events=events,
+        source="steam",
+    )
+
+    if imported > 0:
+        background_tasks.add_task(run_user_analysis, user_id, "steam")
+        background_tasks.add_task(run_user_analysis, user_id, None)
+
+    return {
+        "success": True,
+        "source": "steam",
+        "total": len(games),
+        "imported": imported,
+        "duplicates": duplicates,
+        "message": f"Imported {imported} Steam games ({duplicates} already existed).",
+    }

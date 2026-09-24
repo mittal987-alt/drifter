@@ -21,6 +21,7 @@ class YouTubeExtensionEvent(BaseModel):
     channel: str | None = None
     artist: str | None = None
     url: str | None = None
+    source: str | None = "youtube"
     watchedSeconds: float | int | None = None
     durationSeconds: float | int | None = None
     watchedAt: str | datetime | None = None
@@ -66,6 +67,7 @@ def sync_youtube_extension_history(
     for ev in payload.events:
         channel_name = ev.channel or ev.artist
         event_url = ev.url or (f"https://www.youtube.com/watch?v={ev.videoId}" if ev.videoId else None)
+        ev_source = (ev.source or "youtube").lower()
 
         ts = ev.watchedAt or datetime.utcnow()
 
@@ -83,7 +85,7 @@ def sync_youtube_extension_history(
                 "artist": channel_name,
                 "url": event_url,
                 "timestamp": ts,
-                "source": "youtube",
+                "source": ev_source,
                 "metadata": metadata,
             }
         )

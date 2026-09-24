@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Drifter — YouTube History Sync",
-  "version": "1.0.0",
-  "description": "Tracks videos watched on youtube.com and syncs them to your Drifter history dashboard.",
+  "name": "Drifter — Multi-Platform History Sync",
+  "version": "1.1.0",
+  "description": "Tracks YouTube videos, Netflix streaming, GitHub research, and Reddit discussions to sync with your Drifter dashboard.",
   "permissions": [
     "storage",
     "alarms",
@@ -12,6 +12,9 @@
   "host_permissions": [
     "https://*.youtube.com/*",
     "https://youtube.com/*",
+    "https://*.netflix.com/*",
+    "https://github.com/*",
+    "https://*.reddit.com/*",
     "http://127.0.0.1:*/*",
     "http://localhost:*/*"
   ],
@@ -22,7 +25,10 @@
     {
       "matches": [
         "https://www.youtube.com/*",
-        "https://*.youtube.com/*"
+        "https://*.youtube.com/*",
+        "https://*.netflix.com/*",
+        "https://github.com/*",
+        "https://*.reddit.com/*"
       ],
       "js": [
         "content.js"

@@ -40,6 +40,7 @@ import TopicDistribution from "@/components/analytics/TopicDistribution";
 import PredictionView from "@/components/prediction/PredictionView";
 import CorrelationView from "@/components/analytics/CorrelationView";
 import InterestDnaCard from "@/components/reports/InterestDnaCard";
+import PlatformIntelligenceHub from "@/components/analytics/PlatformIntelligenceHub";
 import type { DashboardData } from "@/services/analytics";
 import { deleteHistoryEvent, clearHistory, type HistoryEvent } from "@/services/history";
 
@@ -62,6 +63,9 @@ interface WorkspaceProps {
   historyLoading: boolean;
   onOpenView: (view: WorkspaceView) => void;
   onRefresh?: () => void;
+  onOpenImport?: () => void;
+  onOpenExtension?: () => void;
+  onConnectSpotify?: () => void;
 }
 
 
@@ -152,7 +156,14 @@ function TopicList({ topics, onSelect }: { topics: TopicPoint[]; onSelect?: (top
   );
 }
 
-export function OverviewView({ dashboard, onOpenView, onRefresh }: WorkspaceProps) {
+export function OverviewView({
+  dashboard,
+  onOpenView,
+  onRefresh,
+  onOpenImport,
+  onOpenExtension,
+  onConnectSpotify,
+}: WorkspaceProps) {
   const overview = dashboard.overview;
   const assignments = assignmentsOf(dashboard);
   const latest = assignments.slice(-5).reverse();
@@ -214,6 +225,12 @@ export function OverviewView({ dashboard, onOpenView, onRefresh }: WorkspaceProp
       </div>
 
       <div className="mt-6 space-y-6">
+        <PlatformIntelligenceHub
+          assignments={assignments}
+          onOpenImport={onOpenImport}
+          onOpenExtension={onOpenExtension}
+          onConnectSpotify={onConnectSpotify}
+        />
         <TopicDistribution topics={dashboard.top_topics} />
         <InterestMomentum
           rising={dashboard.evolution.rising}
@@ -434,13 +451,13 @@ export function BehaviorView({ dashboard, onOpenView }: WorkspaceProps) {
 
 export function HistoryView({ dashboard, history, historyLoading, onRefresh }: WorkspaceProps) {
   const [query, setQuery] = useState("");
-  const [sourceFilter, setSourceFilter] = useState<"all" | "youtube" | "spotify">("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [topicFilter, setTopicFilter] = useState<string>("all");
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
   const [localHistory, setLocalHistory] = useState<HistoryEvent[]>(history);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [showClearModal, setShowClearModal] = useState(false);
-  const [clearSource, setClearSource] = useState<"all" | "youtube" | "spotify">("all");
+  const [clearSource, setClearSource] = useState<string>("all");
   const [clearing, setClearing] = useState(false);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
 
@@ -476,14 +493,12 @@ export function HistoryView({ dashboard, history, historyLoading, onRefresh }: W
 
   // Source counts
   const sourceCounts = useMemo(() => {
-    let yt = 0;
-    let sp = 0;
+    const counts: Record<string, number> = { all: localHistory.length };
     localHistory.forEach((e) => {
-      const s = (e.source || "").toLowerCase();
-      if (s === "youtube") yt++;
-      else if (s === "spotify") sp++;
+      const s = (e.source || "youtube").toLowerCase();
+      counts[s] = (counts[s] || 0) + 1;
     });
-    return { all: localHistory.length, youtube: yt, spotify: sp };
+    return counts;
   }, [localHistory]);
 
   const filtered = useMemo(() => {
@@ -670,7 +685,7 @@ export function HistoryView({ dashboard, history, historyLoading, onRefresh }: W
         {/* SECONDARY TOOLBAR: FILTERS & SORTS */}
         <div className="mt-3.5 pt-3 border-t border-white/[0.06] flex flex-wrap items-center justify-between gap-3 text-xs">
           {/* SOURCE PILLS */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-[11px] text-white/35 font-medium mr-1">Source:</span>
             <button
               onClick={() => setSourceFilter("all")}
@@ -680,28 +695,26 @@ export function HistoryView({ dashboard, history, historyLoading, onRefresh }: W
                   : "border-white/[0.08] bg-white/[0.02] text-white/50 hover:text-white"
               }`}
             >
-              All ({sourceCounts.all})
+              All ({sourceCounts.all || 0})
             </button>
-            <button
-              onClick={() => setSourceFilter("youtube")}
-              className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium transition ${
-                sourceFilter === "youtube"
-                  ? "border-rose-500/40 bg-rose-500/10 text-rose-200"
-                  : "border-white/[0.08] bg-white/[0.02] text-white/50 hover:text-white"
-              }`}
-            >
-              YouTube ({sourceCounts.youtube})
-            </button>
-            <button
-              onClick={() => setSourceFilter("spotify")}
-              className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium transition ${
-                sourceFilter === "spotify"
-                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
-                  : "border-white/[0.08] bg-white/[0.02] text-white/50 hover:text-white"
-              }`}
-            >
-              Spotify ({sourceCounts.spotify})
-            </button>
+            {Object.entries(sourceCounts)
+              .filter(([k]) => k !== "all")
+              .map(([src, count]) => {
+                const isSelected = sourceFilter === src;
+                return (
+                  <button
+                    key={src}
+                    onClick={() => setSourceFilter(src)}
+                    className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium capitalize transition ${
+                      isSelected
+                        ? "border-white/40 bg-white/[0.1] text-white"
+                        : "border-white/[0.08] bg-white/[0.02] text-white/50 hover:text-white"
+                    }`}
+                  >
+                    {src} ({count})
+                  </button>
+                );
+              })}
           </div>
 
           {/* TOPIC SELECT & SORT */}
@@ -829,40 +842,33 @@ export function HistoryView({ dashboard, history, historyLoading, onRefresh }: W
 
             <div className="space-y-2 pt-2 border-t border-white/[0.07]">
               <label className="text-xs font-medium text-white/70 block">Select Scope to Clear:</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 <button
                   type="button"
                   onClick={() => setClearSource("all")}
-                  className={`rounded-xl border p-2.5 text-center text-xs font-medium transition ${
+                  className={`rounded-xl border p-2.5 text-center text-xs font-medium transition col-span-4 ${
                     clearSource === "all"
                       ? "border-rose-500/50 bg-rose-500/15 text-rose-200"
                       : "border-white/[0.08] bg-white/[0.02] text-white/60 hover:text-white"
                   }`}
                 >
-                  All ({sourceCounts.all})
+                  All Platforms ({sourceCounts.all || 0})
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setClearSource("youtube")}
-                  className={`rounded-xl border p-2.5 text-center text-xs font-medium transition ${
-                    clearSource === "youtube"
-                      ? "border-rose-500/50 bg-rose-500/15 text-rose-200"
-                      : "border-white/[0.08] bg-white/[0.02] text-white/60 hover:text-white"
-                  }`}
-                >
-                  YouTube ({sourceCounts.youtube})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setClearSource("spotify")}
-                  className={`rounded-xl border p-2.5 text-center text-xs font-medium transition ${
-                    clearSource === "spotify"
-                      ? "border-rose-500/50 bg-rose-500/15 text-rose-200"
-                      : "border-white/[0.08] bg-white/[0.02] text-white/60 hover:text-white"
-                  }`}
-                >
-                  Spotify ({sourceCounts.spotify})
-                </button>
+                {(["youtube", "spotify", "github", "reddit", "netflix", "steam", "browser"] as const).map((src) => (
+                  <button
+                    key={src}
+                    type="button"
+                    onClick={() => setClearSource(src)}
+                    className={`rounded-xl border p-2 text-center text-[10px] font-medium capitalize transition ${
+                      clearSource === src
+                        ? "border-rose-500/50 bg-rose-500/15 text-rose-200"
+                        : "border-white/[0.08] bg-white/[0.02] text-white/50 hover:text-white"
+                    }`}
+                  >
+                    {src === "browser" ? "Browser" : src.charAt(0).toUpperCase() + src.slice(1)}<br />
+                    <span className="text-white/35">({sourceCounts[src] || 0})</span>
+                  </button>
+                ))}
               </div>
             </div>
 

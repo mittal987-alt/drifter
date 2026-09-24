@@ -13,6 +13,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { chatWithHistory, type ChatResponse } from "@/services/analytics";
+import { BorderBeam } from "@/components/ui/border-beam";
+import { motion } from "motion/react";
 
 interface Message {
   id: string;
@@ -171,9 +173,11 @@ export default function HistoryChatModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-6 animate-in fade-in duration-200">
-      <div className="flex flex-col w-full max-w-2xl h-[88vh] max-h-[800px] bg-[#09090c] border border-white/[0.09] rounded-2xl shadow-2xl overflow-hidden">
+      <div className="relative flex flex-col w-full max-w-2xl h-[88vh] max-h-[800px] bg-[#09090c] border border-white/[0.09] rounded-2xl shadow-2xl overflow-hidden">
+        <BorderBeam size={180} duration={8} borderWidth={1.5} colorFrom="#f59e0b" colorTo="#a855f7" />
+
         {/* HEADER */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.07] bg-white/[0.015]">
+        <div className="relative z-10 flex items-center justify-between px-5 py-3.5 border-b border-white/[0.07] bg-white/[0.015]">
           <div className="flex items-center gap-3">
             <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500/20 via-rose-500/15 to-purple-500/20 border border-white/10 text-amber-300">
               <Bot size={17} />
