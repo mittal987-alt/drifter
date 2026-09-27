@@ -8,12 +8,16 @@ ENV/
 *.pyd
 __pycache__/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 *.egg-info/
 .eggs/
+build/
+dist/
 
-# Node.js / Frontend dependencies & build outputs
+# Node.js & Frontend
 node_modules/
 frontend/node_modules/
 dist/
@@ -21,6 +25,8 @@ dist-ssr/
 frontend/dist/
 .vite/
 .cache/
+.eslintcache
+*.tsbuildinfo
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -29,11 +35,14 @@ pnpm-debug.log*
 
 # Environment & Secrets
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
 backend/.env
+frontend/.env
+
+# Chrome Extension / Browser Extension Packaging & Keys
+*.pem
+*.crx
 
 # Databases & SQLite
 *.db
@@ -45,11 +54,14 @@ backend/data/*.db
 # IDE & OS Files
 .DS_Store
 Thumbs.db
+ehthumbs.db
+desktop.ini
 .vscode/*
 !.vscode/extensions.json
 .idea/
 *.swp
 *.swo
+*.tmp
 
 # Export Archives & Temporary Data
 *.zip
