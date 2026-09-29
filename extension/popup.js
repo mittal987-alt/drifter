@@ -28,6 +28,25 @@ document.addEventListener("DOMContentLoaded", () => {
           queue.length === 1 ? "event" : "events"
         }`;
 
+        // Per-source breakdown
+        const breakdown = {};
+        for (const ev of queue) {
+          const src = (ev.source || "youtube").toLowerCase();
+          breakdown[src] = (breakdown[src] || 0) + 1;
+        }
+        const breakdownEl = document.getElementById("sourceBreakdown");
+        if (breakdownEl) {
+          if (Object.keys(breakdown).length > 0) {
+            breakdownEl.textContent = Object.entries(breakdown)
+              .sort((a, b) => b[1] - a[1])
+              .map(([src, count]) => `${src}: ${count}`)
+              .join(" · ");
+            breakdownEl.style.display = "block";
+          } else {
+            breakdownEl.style.display = "none";
+          }
+        }
+
         const status = data.lastSyncStatus || "IDLE";
         const lastTime = data.lastSyncTime
           ? new Date(data.lastSyncTime).toLocaleTimeString([], {

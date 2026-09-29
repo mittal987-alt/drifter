@@ -83,13 +83,18 @@ def _get_reddit_connection(user_id: int, db: Session) -> Connection:
 # LOGIN
 # ============================================================
 
+def _is_placeholder(val: str | None) -> bool:
+    if not val:
+        return True
+    v = val.strip().lower()
+    return v.startswith("your_") or "placeholder" in v or "change-me" in v or v == "none"
+
+
 @router.get("/login")
 def reddit_login(request: Request):
-    if not settings.REDDIT_CLIENT_ID:
-        raise HTTPException(
-            status_code=501,
-            detail="Reddit OAuth is not configured. Add REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET to your .env file.",
-        )
+    frontend = settings.FRONTEND_URL
+    if _is_placeholder(settings.REDDIT_CLIENT_ID) or _is_placeholder(settings.REDDIT_CLIENT_SECRET):
+        return RedirectResponse(f"{frontend}/?reddit_error=not_configured")
 
     state = secrets.token_urlsafe(16)
     request.session["reddit_oauth_state"] = state

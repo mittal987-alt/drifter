@@ -79,6 +79,14 @@ function BrowserIcon({ size = 18, className = "" }: { size?: number; className?:
   );
 }
 
+function TwitterIcon({ size = 18, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
 export type PlatformId =
   | "youtube"
   | "spotify"
@@ -86,6 +94,7 @@ export type PlatformId =
   | "reddit"
   | "netflix"
   | "steam"
+  | "twitter"
   | "browser";
 
 interface PlatformDef {
@@ -95,7 +104,7 @@ interface PlatformDef {
   icon: React.ComponentType<{ size?: number; className?: string }>;
   color: string;
   bgGlow: string;
-  ingestionType: "Extension" | "OAuth API" | "CSV / Export" | "Dual (API + Ext)";
+  ingestionType: string;
   cognitiveRole: string;
   description: string;
   signalsCaptured: string[];
@@ -110,7 +119,7 @@ const PLATFORMS: PlatformDef[] = [
     icon: YoutubeIcon,
     color: "#ff3e3e",
     bgGlow: "rgba(255, 62, 62, 0.12)",
-    ingestionType: "Dual (API + Ext)",
+    ingestionType: "Real-Time Extension & API",
     cognitiveRole: "Visual attention, tutorial learning & intellectual rabbit holes",
     description:
       "Captures long-form video knowledge, documentary deep-dives, coding walkthroughs, and visual entertainment trends over time.",
@@ -129,7 +138,7 @@ const PLATFORMS: PlatformDef[] = [
     icon: SpotifyIcon,
     color: "#1db954",
     bgGlow: "rgba(29, 185, 84, 0.12)",
-    ingestionType: "OAuth API",
+    ingestionType: "1-Click OAuth API & Web Extension",
     cognitiveRole: "Mood regulation, focus rhythms & acoustic genre evolution",
     description:
       "Syncs streaming audio history to understand emotional state, deep work music patterns, and musical artist affinity drift.",
@@ -148,7 +157,7 @@ const PLATFORMS: PlatformDef[] = [
     icon: GithubIcon,
     color: "#a371f7",
     bgGlow: "rgba(163, 113, 247, 0.12)",
-    ingestionType: "OAuth API",
+    ingestionType: "1-Click OAuth API & Extension",
     cognitiveRole: "Technical curiosity, language migration & open-source exploration",
     description:
       "Monitors starred repositories, commit activity, language shifts (e.g. TypeScript → Rust → Python), and emerging tech libraries.",
@@ -167,7 +176,7 @@ const PLATFORMS: PlatformDef[] = [
     icon: RedditIcon,
     color: "#ff5722",
     bgGlow: "rgba(255, 87, 34, 0.12)",
-    ingestionType: "CSV / Export",
+    ingestionType: "1-Click OAuth API & Extension",
     cognitiveRole: "Subculture exploration, hobby deep-dives & informal debates",
     description:
       "Analyzes subreddits you browse and upvote to uncover hyper-specific interests, amateur hardware projects, and niche hobbies.",
@@ -186,7 +195,7 @@ const PLATFORMS: PlatformDef[] = [
     icon: NetflixIcon,
     color: "#e50914",
     bgGlow: "rgba(229, 9, 20, 0.12)",
-    ingestionType: "Extension",
+    ingestionType: "Real-Time Stream Extension",
     cognitiveRole: "Narrative taste, genre aesthetics & entertainment cycles",
     description:
       "Passive extension capture and viewing history CSV parsing to map changes in movie tastes, directorial preferences, and binge patterns.",
@@ -205,7 +214,7 @@ const PLATFORMS: PlatformDef[] = [
     icon: SteamIcon,
     color: "#66c0f4",
     bgGlow: "rgba(102, 192, 244, 0.12)",
-    ingestionType: "OAuth API",
+    ingestionType: "Direct Steam Web API & Extension",
     cognitiveRole: "Strategic thinking, escapism & interactive game genres",
     description:
       "Pulls playtime metrics and game genres to analyze how you relax, compete, and explore virtual worlds.",
@@ -218,13 +227,32 @@ const PLATFORMS: PlatformDef[] = [
     defaultTopics: ["Grand Strategy", "Sci-Fi Roguelikes", "Tactical RPGs", "Automation Sims", "Indie Puzzlers"],
   },
   {
+    id: "twitter",
+    name: "X (Twitter)",
+    category: "Real-Time Discourse & Ideas",
+    icon: TwitterIcon,
+    color: "#1d9bf0",
+    bgGlow: "rgba(29, 155, 240, 0.12)",
+    ingestionType: "Real-Time Extension & Archive",
+    cognitiveRole: "Viral ideas, tech discourse, thought leaders & breaking news",
+    description:
+      "Passively tracks tweet reading, tech threads, author handles, and viral commentary in real time via the Drifter Chrome Extension.",
+    signalsCaptured: [
+      "Read tweets & thread dwell time",
+      "Author affinity tracking",
+      "Tech & AI discussion clusters",
+      "Emerging viral trends & discourse",
+    ],
+    defaultTopics: ["AI Research & Models", "Tech Startups & VC", "Open Source Libraries", "Macroeconomics", "Creative Coding"],
+  },
+  {
     id: "browser",
     name: "Web Browsing",
     category: "360° Curiosity Engine",
     icon: BrowserIcon,
     color: "#38bdf8",
     bgGlow: "rgba(56, 189, 248, 0.12)",
-    ingestionType: "Extension",
+    ingestionType: "360° Real-Time Browser Extension",
     cognitiveRole: "Spontaneous curiosity, Wikipedia spirals & deep web research",
     description:
       "The ultimate cross-web layer. The Drifter extension safely captures search queries, documentation pages, and reading sessions.",
@@ -276,6 +304,7 @@ export default function PlatformIntelligenceHub({
       reddit: 0,
       netflix: 0,
       steam: 0,
+      twitter: 0,
       browser: 0,
     };
     for (const a of assignments) {
@@ -488,17 +517,26 @@ export default function PlatformIntelligenceHub({
                 <div className="pt-2 flex flex-wrap items-center gap-3">
                   {/* Spotify */}
                   {activeDef.id === "spotify" && (
-                    <ShimmerButton
-                      onClick={onConnectSpotify}
-                      shimmerColor="#1db954"
-                      background="rgba(29, 185, 84, 0.15)"
-                      className="border-[#1db954]/40 text-xs text-emerald-300 h-9 px-4"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <PlugZap size={14} />
-                        <span>Connect Spotify Account</span>
-                      </span>
-                    </ShimmerButton>
+                    <>
+                      <ShimmerButton
+                        onClick={onConnectSpotify}
+                        shimmerColor="#1db954"
+                        background="rgba(29, 185, 84, 0.15)"
+                        className="border-[#1db954]/40 text-xs text-emerald-300 h-9 px-4"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <PlugZap size={14} />
+                          <span>1-Click Spotify OAuth Connect</span>
+                        </span>
+                      </ShimmerButton>
+                      <button
+                        onClick={onOpenExtension}
+                        className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/[0.07] transition"
+                      >
+                        <Puzzle size={13} className="text-emerald-400" />
+                        <span>Web Player Extension Sync</span>
+                      </button>
+                    </>
                   )}
 
                   {/* YouTube */}
@@ -511,98 +549,137 @@ export default function PlatformIntelligenceHub({
                     >
                       <span className="flex items-center gap-1.5">
                         <Puzzle size={14} />
-                        <span>Sync via Extension</span>
+                        <span>Sync via Real-Time Extension</span>
                       </span>
                     </ShimmerButton>
                   )}
 
                   {/* GitHub — OAuth */}
                   {activeDef.id === "github" && (
-                    <ShimmerButton
-                      onClick={() => setGithubModalOpen(true)}
-                      shimmerColor="#a371f7"
-                      background="rgba(163,113,247,0.15)"
-                      className="border-[#a371f7]/40 text-xs text-purple-200 h-9 px-4"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        {githubConnected ? <RefreshCw size={13} /> : <PlugZap size={14} />}
-                        <span>{githubConnected ? "Manage GitHub" : "Connect GitHub"}</span>
-                      </span>
-                    </ShimmerButton>
+                    <>
+                      <ShimmerButton
+                        onClick={() => setGithubModalOpen(true)}
+                        shimmerColor="#a371f7"
+                        background="rgba(163,113,247,0.15)"
+                        className="border-[#a371f7]/40 text-xs text-purple-200 h-9 px-4"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          {githubConnected ? <RefreshCw size={13} /> : <PlugZap size={14} />}
+                          <span>{githubConnected ? "Manage GitHub API" : "1-Click GitHub Connect"}</span>
+                        </span>
+                      </ShimmerButton>
+                      <button
+                        onClick={onOpenExtension}
+                        className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/[0.07] transition"
+                      >
+                        <Puzzle size={13} className="text-purple-400" />
+                        <span>Extension Repo Sync</span>
+                      </button>
+                    </>
                   )}
 
                   {/* Reddit — OAuth */}
                   {activeDef.id === "reddit" && (
-                    <ShimmerButton
-                      onClick={() => setRedditModalOpen(true)}
-                      shimmerColor="#ff5722"
-                      background="rgba(255,87,34,0.15)"
-                      className="border-[#ff5722]/40 text-xs text-orange-200 h-9 px-4"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        {redditConnected ? <RefreshCw size={13} /> : <PlugZap size={14} />}
-                        <span>{redditConnected ? "Manage Reddit" : "Connect Reddit"}</span>
-                      </span>
-                    </ShimmerButton>
+                    <>
+                      <ShimmerButton
+                        onClick={() => setRedditModalOpen(true)}
+                        shimmerColor="#ff5722"
+                        background="rgba(255,87,34,0.15)"
+                        className="border-[#ff5722]/40 text-xs text-orange-200 h-9 px-4"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          {redditConnected ? <RefreshCw size={13} /> : <PlugZap size={14} />}
+                          <span>{redditConnected ? "Manage Reddit API" : "1-Click Reddit Connect"}</span>
+                        </span>
+                      </ShimmerButton>
+                      <button
+                        onClick={onOpenExtension}
+                        className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/[0.07] transition"
+                      >
+                        <Puzzle size={13} className="text-orange-400" />
+                        <span>Extension Thread Sync</span>
+                      </button>
+                    </>
                   )}
 
                   {/* Steam — API Key */}
                   {activeDef.id === "steam" && (
-                    <ShimmerButton
-                      onClick={() => setSteamModalOpen(true)}
-                      shimmerColor="#66c0f4"
-                      background="rgba(102,192,244,0.15)"
-                      className="border-[#66c0f4]/40 text-xs text-sky-200 h-9 px-4"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <PlugZap size={14} />
-                        <span>Enter Steam API Key</span>
-                      </span>
-                    </ShimmerButton>
+                    <>
+                      <ShimmerButton
+                        onClick={() => setSteamModalOpen(true)}
+                        shimmerColor="#66c0f4"
+                        background="rgba(102,192,244,0.15)"
+                        className="border-[#66c0f4]/40 text-xs text-sky-200 h-9 px-4"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <PlugZap size={14} />
+                          <span>Direct Steam API Sync (No CSV)</span>
+                        </span>
+                      </ShimmerButton>
+                      <button
+                        onClick={onOpenExtension}
+                        className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/[0.07] transition"
+                      >
+                        <Puzzle size={13} className="text-sky-400" />
+                        <span>Extension Store Sync</span>
+                      </button>
+                    </>
                   )}
 
                   {/* Netflix — extension passive */}
                   {activeDef.id === "netflix" && (
                     <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1.5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+                      <div className="flex items-center gap-1.5 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
                         <Wifi size={13} />
-                        <span>Extension captures passively</span>
+                        <span>Real-Time Extension Active</span>
                       </div>
                       <button
                         onClick={onOpenExtension}
-                        className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/60 hover:text-white hover:bg-white/[0.07] transition"
+                        className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/[0.07] transition"
                       >
-                        <Puzzle size={13} /> Extension Settings
+                        <Puzzle size={13} /> Extension Setup
                       </button>
                     </div>
                   )}
 
-                  {/* Browser — extension passive */}
+                  {/* Twitter / X */}
+                  {activeDef.id === "twitter" && (
+                    <ShimmerButton
+                      onClick={onOpenExtension}
+                      shimmerColor="#1d9bf0"
+                      background="rgba(29, 155, 240, 0.15)"
+                      className="border-sky-400/40 text-xs text-sky-200 h-9 px-4"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Puzzle size={14} />
+                        <span>Sync via Real-Time Extension</span>
+                      </span>
+                    </ShimmerButton>
+                  )}
+
+                  {/* Browser — extension sync like YouTube */}
                   {activeDef.id === "browser" && (
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1.5 rounded-xl border border-sky-500/25 bg-sky-500/10 px-3 py-2 text-xs text-sky-300">
-                        <Wifi size={13} />
-                        <span>Extension captures passively</span>
-                      </div>
-                      <button
-                        onClick={onOpenExtension}
-                        className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/60 hover:text-white hover:bg-white/[0.07] transition"
-                      >
-                        <Puzzle size={13} /> Extension Settings
-                      </button>
-                    </div>
+                    <ShimmerButton
+                      onClick={onOpenExtension}
+                      shimmerColor="#38bdf8"
+                      background="rgba(56, 189, 248, 0.15)"
+                      className="border-sky-500/40 text-xs text-sky-200 h-9 px-4"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Puzzle size={14} />
+                        <span>Sync via Real-Time Extension</span>
+                      </span>
+                    </ShimmerButton>
                   )}
 
                   {/* Fallback upload button for platforms that also support CSV */}
-                  {["youtube", "spotify", "reddit", "netflix"].includes(activeDef.id) && (
-                    <button
-                      onClick={onOpenImport}
-                      className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-white/60 transition hover:bg-white/[0.08] hover:text-white"
-                    >
-                      <UploadCloud size={13} />
-                      <span>Upload CSV / Export</span>
-                    </button>
-                  )}
+                  <button
+                    onClick={onOpenImport}
+                    className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-white/50 transition hover:bg-white/[0.08] hover:text-white"
+                  >
+                    <UploadCloud size={13} />
+                    <span>Or Upload File / CSV</span>
+                  </button>
                 </div>
               </div>
 

@@ -198,7 +198,7 @@ async def import_history(
     # ---------------------------------------------------------
 
     SUPPORTED_SOURCES = {
-        "youtube", "spotify", "github", "reddit", "netflix", "steam", "browser"
+        "youtube", "spotify", "github", "reddit", "netflix", "steam", "browser", "twitter"
     }
 
     if source not in SUPPORTED_SOURCES:
@@ -406,7 +406,7 @@ def get_history_events(
         source = source.lower().strip()
 
         SUPPORTED_SOURCES = {
-            "youtube", "spotify", "github", "reddit", "netflix", "steam", "browser"
+            "youtube", "spotify", "github", "reddit", "netflix", "steam", "browser", "twitter"
         }
         if source not in SUPPORTED_SOURCES:
             raise HTTPException(
@@ -493,7 +493,7 @@ def clear_history(
         source = source.lower().strip()
 
         SUPPORTED_SOURCES = {
-            "youtube", "spotify", "github", "reddit", "netflix", "steam", "browser", "extension"
+            "youtube", "spotify", "github", "reddit", "netflix", "steam", "browser", "twitter", "extension"
         }
         if source not in SUPPORTED_SOURCES:
             raise HTTPException(

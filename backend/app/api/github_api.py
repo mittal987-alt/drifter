@@ -52,14 +52,19 @@ def _get_github_connection(user_id: int, db: Session) -> Connection:
 # LOGIN — redirect to GitHub OAuth
 # ============================================================
 
+def _is_placeholder(val: str | None) -> bool:
+    if not val:
+        return True
+    v = val.strip().lower()
+    return v.startswith("your_") or "placeholder" in v or "change-me" in v or v == "none"
+
+
 @router.get("/login")
 def github_login(request: Request):
     """Redirect the user to GitHub's OAuth authorization page."""
-    if not settings.GITHUB_CLIENT_ID:
-        raise HTTPException(
-            status_code=501,
-            detail="GitHub OAuth is not configured. Add GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to your .env file.",
-        )
+    frontend = settings.FRONTEND_URL
+    if _is_placeholder(settings.GITHUB_CLIENT_ID) or _is_placeholder(settings.GITHUB_CLIENT_SECRET):
+        return RedirectResponse(f"{frontend}/?github_error=not_configured")
 
     state = secrets.token_urlsafe(16)
     request.session["github_oauth_state"] = state

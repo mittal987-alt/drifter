@@ -1,6 +1,6 @@
 from typing import Any
 from datetime import datetime
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,7 @@ from app.api.dependencies import (
 )
 from app.database.database import get_db
 from app.api.history import save_history_events
+from app.services.analysis_cache_service import delete_cached_analysis
 from app.services.analysis_runner import run_user_analysis
 
 router = APIRouter(tags=["Extension Sync"])
@@ -43,6 +44,7 @@ def get_extension_token(
     }
 
 
+@router.post("/api/history/extension-sync")
 @router.post("/api/youtube-history")
 @router.post("/api/history/youtube-extension")
 def sync_youtube_extension_history(
@@ -66,8 +68,15 @@ def sync_youtube_extension_history(
     formatted_events = []
     for ev in payload.events:
         channel_name = ev.channel or ev.artist
-        event_url = ev.url or (f"https://www.youtube.com/watch?v={ev.videoId}" if ev.videoId else None)
         ev_source = (ev.source or "youtube").lower()
+
+        # Build a sensible URL per source
+        if ev.url:
+            event_url = ev.url
+        elif ev_source == "youtube" and ev.videoId:
+            event_url = f"https://www.youtube.com/watch?v={ev.videoId}"
+        else:
+            event_url = None
 
         ts = ev.watchedAt or datetime.utcnow()
 
@@ -90,14 +99,26 @@ def sync_youtube_extension_history(
             }
         )
 
+    # Collect all unique sources present in this batch so we can
+    # invalidate the right per-source analysis caches.
+    sources_in_batch = list({e["source"] for e in formatted_events})
+
     imported, duplicates = save_history_events(
         db=db,
         user_id=user_id,
         events=formatted_events,
-        source="youtube",
+        # Pass None so the function uses each event's own source field;
+        # we handle cache invalidation ourselves below.
+        source=sources_in_batch[0] if len(sources_in_batch) == 1 else "youtube",
     )
 
     if imported > 0:
+        # Invalidate analysis cache for every source that was imported,
+        # plus the combined all-sources cache.
+        for src in sources_in_batch:
+            delete_cached_analysis(user_id=user_id, source=src)
+        delete_cached_analysis(user_id=user_id, source=None)
+
         background_tasks.add_task(
             run_user_analysis,
             user_id,

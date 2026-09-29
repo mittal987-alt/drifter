@@ -854,7 +854,7 @@ export function HistoryView({ dashboard, history, historyLoading, onRefresh }: W
                 >
                   All Platforms ({sourceCounts.all || 0})
                 </button>
-                {(["youtube", "spotify", "github", "reddit", "netflix", "steam", "browser"] as const).map((src) => (
+                {(["youtube", "spotify", "github", "reddit", "netflix", "steam", "twitter", "browser"] as const).map((src) => (
                   <button
                     key={src}
                     type="button"
@@ -865,7 +865,7 @@ export function HistoryView({ dashboard, history, historyLoading, onRefresh }: W
                         : "border-white/[0.08] bg-white/[0.02] text-white/50 hover:text-white"
                     }`}
                   >
-                    {src === "browser" ? "Browser" : src.charAt(0).toUpperCase() + src.slice(1)}<br />
+                    {src === "twitter" ? "X / Twitter" : src === "browser" ? "Browser" : src.charAt(0).toUpperCase() + src.slice(1)}<br />
                     <span className="text-white/35">({sourceCounts[src] || 0})</span>
                   </button>
                 ))}

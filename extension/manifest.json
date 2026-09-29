@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Drifter — Multi-Platform History Sync",
   "version": "1.1.0",
-  "description": "Tracks YouTube videos, Netflix streaming, GitHub research, and Reddit discussions to sync with your Drifter dashboard.",
+  "description": "Multi-platform real-time sync for YouTube, Spotify, GitHub, Reddit, Netflix, Steam, and Web Browsing with Drifter.",
   "permissions": [
     "storage",
     "alarms",
@@ -10,11 +10,7 @@
     "scripting"
   ],
   "host_permissions": [
-    "https://*.youtube.com/*",
-    "https://youtube.com/*",
-    "https://*.netflix.com/*",
-    "https://github.com/*",
-    "https://*.reddit.com/*",
+    "<all_urls>",
     "http://127.0.0.1:*/*",
     "http://localhost:*/*"
   ],
@@ -24,11 +20,7 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.youtube.com/*",
-        "https://*.youtube.com/*",
-        "https://*.netflix.com/*",
-        "https://github.com/*",
-        "https://*.reddit.com/*"
+        "<all_urls>"
       ],
       "js": [
         "content.js"

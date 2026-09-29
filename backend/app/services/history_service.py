@@ -362,6 +362,65 @@ def normalize_browser_event(item: dict):
 
 
 # --------------------------------------------------
+# Twitter / X History
+# --------------------------------------------------
+
+def normalize_twitter_event(item: dict):
+    if not isinstance(item, dict):
+        return None
+
+    tweet_data = item.get("tweet") if isinstance(item.get("tweet"), dict) else item
+
+    raw_text = (
+        tweet_data.get("full_text")
+        or tweet_data.get("text")
+        or tweet_data.get("title")
+        or tweet_data.get("body")
+        or ""
+    )
+    if not raw_text:
+        return None
+
+    # Clean leading whitespace and newlines for title
+    cleaned_title = " ".join(raw_text.split())[:200]
+
+    author = (
+        tweet_data.get("author")
+        or tweet_data.get("username")
+        or tweet_data.get("screen_name")
+        or tweet_data.get("user")
+        or tweet_data.get("channel")
+    )
+    if isinstance(author, dict):
+        author = author.get("screen_name") or author.get("name") or author.get("username")
+
+    tweet_id = tweet_data.get("id") or tweet_data.get("id_str")
+    url = tweet_data.get("url")
+    if not url and tweet_id:
+        handle = author.lstrip("@") if author else "i"
+        url = f"https://x.com/{handle}/status/{tweet_id}"
+
+    timestamp = parse_timestamp(
+        tweet_data.get("created_at")
+        or tweet_data.get("timestamp")
+        or tweet_data.get("date")
+        or tweet_data.get("time")
+    )
+    if not timestamp:
+        timestamp = datetime.utcnow()
+
+    return {
+        "timestamp": timestamp,
+        "source": "twitter",
+        "title": cleaned_title,
+        "artist": str(author) if author else None,
+        "url": url,
+        "duration": None,
+        "metadata": item,
+    }
+
+
+# --------------------------------------------------
 # Generic normalization
 # --------------------------------------------------
 
@@ -391,6 +450,9 @@ def normalize_event(
 
     if src in ("browser", "chrome", "web"):
         return normalize_browser_event(item)
+
+    if src in ("twitter", "x"):
+        return normalize_twitter_event(item)
 
     # Fallback to general event normalization
     title = item.get("title") or item.get("name") or item.get("track")

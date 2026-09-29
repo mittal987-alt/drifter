@@ -130,7 +130,7 @@ function App() {
     useState(false);
 
   const [importSource, setImportSource] =
-    useState<"youtube" | "spotify" | "github" | "reddit" | "netflix" | "steam" | "browser">("youtube");
+    useState<"youtube" | "spotify" | "github" | "reddit" | "netflix" | "steam" | "twitter" | "browser">("youtube");
 
   const [importFile, setImportFile] =
     useState<File | null>(null);
@@ -474,6 +474,7 @@ function App() {
                 {importSource === "reddit" && "Upload your Reddit comments or upvoted posts CSV."}
                 {importSource === "netflix" && "Upload your NetflixViewingActivity.csv from Account settings."}
                 {importSource === "steam" && "Upload your Steam games/playtime JSON export."}
+                {importSource === "twitter" && "Upload your Twitter/X archive tweets.js or JSON export."}
                 {importSource === "browser" && "Upload your Chrome/Firefox browsing history JSON or CSV."}
               </p>
             </div>
@@ -502,6 +503,7 @@ function App() {
                   { id: "reddit", label: "Reddit", sub: "Discussions" },
                   { id: "netflix", label: "Netflix", sub: "Viewing CSV" },
                   { id: "steam", label: "Steam", sub: "Games & Playtime" },
+                  { id: "twitter", label: "X / Twitter", sub: "Tweets & Threads" },
                   { id: "browser", label: "Browser", sub: "Web History" },
                 ].map((item) => {
                   const isSelected = importSource === item.id;
@@ -733,6 +735,28 @@ function App() {
       } else {
         setImportError(
           `Google sign-in error: ${googleError}. You can import your YouTube history JSON manually below.`,
+        );
+      }
+    }
+
+    const redditError = params.get("reddit_error");
+    if (redditError) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      if (redditError === "not_configured") {
+        alert(
+          "Reddit API keys are not configured yet in your .env file.\n\nTip: You can use the Drifter Chrome Extension to sync your Reddit reading activity in real time without any API setup, or register an app at reddit.com/prefs/apps and add REDDIT_CLIENT_ID to .env."
+        );
+      } else {
+        alert(`Reddit authorization issue: ${redditError}`);
+      }
+    }
+
+    const githubError = params.get("github_error");
+    if (githubError) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      if (githubError === "not_configured") {
+        alert(
+          "GitHub OAuth is not configured yet in your .env file.\n\nTip: You can use the Drifter Chrome Extension to sync GitHub repositories in real time without setup, or add GITHUB_CLIENT_ID from github.com/settings/developers."
         );
       }
     }

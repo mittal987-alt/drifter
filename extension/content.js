@@ -226,4 +226,185 @@
       }, 10000); // Log after 10s of thread reading
     }
   }
+
+  /* ==========================================================================
+     5. SPOTIFY WEB PLAYER TRACKER
+     ========================================================================== */
+  else if (host.includes("spotify.com")) {
+    let lastLoggedTrack = null;
+
+    function checkSpotifyPlay() {
+      const titleEl = document.querySelector(
+        '[data-testid="now-playing-widget"] [data-testid="context-item-info-title"] a, [data-testid="context-item-info-title"] a, .Root__now-playing-bar [data-testid="context-item-info-title"]'
+      );
+      const artistEl = document.querySelector(
+        '[data-testid="now-playing-widget"] [data-testid="context-item-info-artist"] a, [data-testid="context-item-info-artist"] a, .Root__now-playing-bar [data-testid="context-item-info-artist"]'
+      );
+
+      let title = titleEl?.textContent?.trim();
+      let artist = artistEl?.textContent?.trim();
+
+      if (!title && document.title.includes("•")) {
+        const parts = document.title.split("•");
+        title = parts[0]?.trim();
+        artist = parts[1]?.trim();
+      }
+
+      if (title && title !== "Spotify" && title !== lastLoggedTrack) {
+        const playPauseBtn = document.querySelector(
+          '[data-testid="control-button-playpause"]'
+        );
+        const isPlaying =
+          playPauseBtn?.getAttribute("aria-label")?.toLowerCase().includes("pause") ||
+          playPauseBtn?.getAttribute("title")?.toLowerCase().includes("pause") ||
+          document.title.includes("•");
+
+        if (isPlaying) {
+          lastLoggedTrack = title;
+          const trackUrl = titleEl?.href || window.location.href;
+          const spotifyEvent = {
+            title: title,
+            artist: artist || "Spotify Artist",
+            url: trackUrl,
+            source: "spotify",
+            watchedSeconds: 30,
+            watchedAt: new Date().toISOString(),
+          };
+
+          console.log("[Drifter Sync] Logging Spotify Web Player event:", spotifyEvent);
+          chrome.runtime.sendMessage({
+            type: "YOUTUBE_WATCH_EVENT",
+            payload: spotifyEvent,
+          });
+        }
+      }
+    }
+
+    setInterval(checkSpotifyPlay, 5000);
+  }
+
+  /* ==========================================================================
+     6. STEAM STORE & COMMUNITY TRACKER
+     ========================================================================== */
+  else if (host.includes("steampowered.com") || host.includes("steamcommunity.com")) {
+    const isApp = window.location.pathname.startsWith("/app/");
+    if (isApp) {
+      setTimeout(() => {
+        let gameName = document.querySelector(".apphub_AppName, #appHubAppName")?.textContent?.trim();
+        if (!gameName) {
+          gameName = document.title.replace("on Steam", "").replace(/Save \d+%.*/, "").trim();
+        }
+
+        const steamEvent = {
+          title: gameName || "Steam Game",
+          artist: "Steam Store",
+          url: window.location.href,
+          source: "steam",
+          watchedSeconds: 20,
+          watchedAt: new Date().toISOString(),
+        };
+
+        console.log("[Drifter Sync] Logging Steam event:", steamEvent);
+        chrome.runtime.sendMessage({
+          type: "YOUTUBE_WATCH_EVENT",
+          payload: steamEvent,
+        });
+      }, 8000);
+    }
+  }
+
+  /* ==========================================================================
+     7. TWITTER / X TRACKER
+     ========================================================================== */
+  else if (host.includes("twitter.com") || host.includes("x.com")) {
+    let lastLoggedTweet = null;
+
+    function checkTwitterTweet() {
+      if (window.location.pathname.includes("/status/")) {
+        const tweetId = window.location.pathname.split("/status/")[1]?.split(/[?&#/]/)[0];
+        if (tweetId && tweetId !== lastLoggedTweet) {
+          setTimeout(() => {
+            const tweetTextEl = document.querySelector('article[data-testid="tweet"] [data-testid="tweetText"]');
+            const tweetText = tweetTextEl?.textContent?.trim() || "";
+            const authorEl = document.querySelector('article[data-testid="tweet"] [data-testid="User-Name"]');
+            const authorText = authorEl?.textContent?.replace(/\s+/g, " ")?.trim() || "X User";
+
+            if (tweetText && tweetId !== lastLoggedTweet) {
+              lastLoggedTweet = tweetId;
+              const handleMatch = authorText.match(/@(\w+)/);
+              const authorHandle = handleMatch ? `@${handleMatch[1]}` : authorText.slice(0, 25);
+
+              const twitterEvent = {
+                title: tweetText.slice(0, 160),
+                artist: authorHandle,
+                url: window.location.href,
+                source: "twitter",
+                watchedSeconds: 15,
+                watchedAt: new Date().toISOString(),
+              };
+
+              console.log("[Drifter Sync] Logging Twitter/X event:", twitterEvent);
+              chrome.runtime.sendMessage({
+                type: "YOUTUBE_WATCH_EVENT",
+                payload: twitterEvent,
+              });
+            }
+          }, 6000);
+        }
+      }
+    }
+
+    setInterval(checkTwitterTweet, 4000);
+  }
+
+  /* ==========================================================================
+     8. GENERAL WEB BROWSING (360° Curiosity Engine)
+     ========================================================================== */
+  else {
+    const isInternal =
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "0.0.0.0" ||
+      host.endsWith(".local") ||
+      host.includes("accounts.google.com");
+
+    const pathname = window.location.pathname.toLowerCase();
+    const isAuth =
+      pathname.includes("/login") ||
+      pathname.includes("/signin") ||
+      pathname.includes("/signup") ||
+      pathname.includes("/oauth");
+
+    if (!isInternal && !isAuth && document.title) {
+      let logged = false;
+      const dwellTimer = setTimeout(() => {
+        if (logged || document.hidden) return;
+
+        const rawTitle = document.title.trim();
+        if (rawTitle.length < 4 || rawTitle.toLowerCase() === "loading...") return;
+
+        const metaDesc = document.querySelector('meta[name="description"]')?.getAttribute("content")?.trim() || "";
+        const cleanHost = host.replace(/^www\./, "");
+
+        const browserEvent = {
+          title: rawTitle + (metaDesc ? ` - ${metaDesc.slice(0, 100)}` : ""),
+          artist: cleanHost,
+          url: window.location.href,
+          source: "browser",
+          watchedSeconds: 25,
+          watchedAt: new Date().toISOString(),
+        };
+
+        logged = true;
+        console.log("[Drifter Sync] Logging Web Browsing trace:", browserEvent);
+        chrome.runtime.sendMessage({
+          type: "YOUTUBE_WATCH_EVENT",
+          payload: browserEvent,
+        });
+      }, 15000);
+
+      window.addEventListener("beforeunload", () => clearTimeout(dwellTimer));
+    }
+  }
 })();
+

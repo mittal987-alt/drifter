@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Drifter — YouTube Sync</title>
+  <title>Drifter — Multi-Platform Sync</title>
   <style>
     * {
       box-sizing: border-box;
@@ -153,7 +153,7 @@
     <div class="logo-icon">D</div>
     <div>
       <h1>Drifter Sync</h1>
-      <p>YouTube · Netflix · GitHub · Reddit</p>
+      <p>8-Platform Real-Time Tracker</p>
     </div>
   </div>
 
@@ -162,6 +162,7 @@
       <span class="status-label">Queued Events</span>
       <span class="status-badge" id="queueBadge">0 items</span>
     </div>
+    <div id="sourceBreakdown" style="display:none; font-size: 10px; color: #71717a; margin-top: 2px; font-family: monospace; letter-spacing: 0.3px;"></div>
     <div class="status-row">
       <span class="status-label">Last Sync</span>
       <div class="status-badge">
@@ -171,9 +172,13 @@
     </div>
     <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;">
       <span style="font-size: 9px; padding: 2px 6px; border-radius: 4px; background: rgba(255, 62, 62, 0.15); color: #ff6b6b; border: 1px solid rgba(255, 62, 62, 0.2);">YouTube</span>
-      <span style="font-size: 9px; padding: 2px 6px; border-radius: 4px; background: rgba(229, 9, 20, 0.15); color: #ff6b6b; border: 1px solid rgba(229, 9, 20, 0.2);">Netflix</span>
+      <span style="font-size: 9px; padding: 2px 6px; border-radius: 4px; background: rgba(29, 185, 84, 0.15); color: #4ade80; border: 1px solid rgba(29, 185, 84, 0.2);">Spotify</span>
+      <span style="font-size: 9px; padding: 2px 6px; border-radius: 4px; background: rgba(229, 9, 20, 0.15); color: #fca5a5; border: 1px solid rgba(229, 9, 20, 0.2);">Netflix</span>
       <span style="font-size: 9px; padding: 2px 6px; border-radius: 4px; background: rgba(163, 113, 247, 0.15); color: #c4b5fd; border: 1px solid rgba(163, 113, 247, 0.2);">GitHub</span>
       <span style="font-size: 9px; padding: 2px 6px; border-radius: 4px; background: rgba(255, 87, 34, 0.15); color: #ff8a65; border: 1px solid rgba(255, 87, 34, 0.2);">Reddit</span>
+      <span style="font-size: 9px; padding: 2px 6px; border-radius: 4px; background: rgba(102, 192, 244, 0.15); color: #7dd3fc; border: 1px solid rgba(102, 192, 244, 0.2);">Steam</span>
+      <span style="font-size: 9px; padding: 2px 6px; border-radius: 4px; background: rgba(29, 155, 240, 0.15); color: #93c5fd; border: 1px solid rgba(29, 155, 240, 0.2);">X / Twitter</span>
+      <span style="font-size: 9px; padding: 2px 6px; border-radius: 4px; background: rgba(56, 189, 248, 0.12); color: #67e8f9; border: 1px solid rgba(56, 189, 248, 0.2);">Web</span>
     </div>
   </div>
 

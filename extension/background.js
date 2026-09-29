@@ -1,4 +1,4 @@
-// background.js - Service Worker for YouTube History Sync
+// background.js - Service Worker for Multi-Platform History Sync (YouTube, Spotify, Netflix, GitHub, Reddit, Steam, Twitter/X, Web)
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8000";
 const ALARM_NAME = "DRIFTER_SYNC_ALARM";
 
@@ -16,7 +16,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 // Listen for messages from content.js or popup.js
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === "YOUTUBE_WATCH_EVENT") {
+  if (message.type === "YOUTUBE_WATCH_EVENT" || message.type === "DRIFTER_TRACE_EVENT") {
     handleIncomingWatchEvent(message.payload);
     sendResponse({ status: "queued" });
   } else if (message.type === "TRIGGER_SYNC_NOW") {
@@ -51,20 +51,36 @@ async function getStorageData() {
 }
 
 async function handleIncomingWatchEvent(event) {
+  if (!event || (!event.title && !event.videoId)) return;
+
   const data = await getStorageData();
   const queue = data.watchQueue;
 
-  const todayStr = new Date(event.watchedAt).toISOString().split("T")[0];
+  const todayStr = new Date(event.watchedAt || Date.now()).toISOString().split("T")[0];
 
-  // Deduplicate same video ID watched on the same day
+  // Deduplicate properly per platform
   const existingIdx = queue.findIndex((q) => {
-    const qDate = new Date(q.watchedAt).toISOString().split("T")[0];
-    return q.videoId === event.videoId && qDate === todayStr;
+    const qDate = new Date(q.watchedAt || Date.now()).toISOString().split("T")[0];
+    if (qDate !== todayStr) return false;
+
+    // YouTube: match videoId
+    if (event.videoId && q.videoId) {
+      return q.videoId === event.videoId;
+    }
+    // URL-based platforms: match exact URL
+    if (event.url && q.url) {
+      return q.url === event.url;
+    }
+    // Fallback: match title and source
+    return (
+      q.title === event.title &&
+      (q.source || "youtube").toLowerCase() === (event.source || "youtube").toLowerCase()
+    );
   });
 
   if (existingIdx >= 0) {
     // Update watch duration if higher
-    if (event.watchedSeconds > queue[existingIdx].watchedSeconds) {
+    if ((event.watchedSeconds || 0) > (queue[existingIdx].watchedSeconds || 0)) {
       queue[existingIdx] = event;
     }
   } else {
@@ -72,9 +88,9 @@ async function handleIncomingWatchEvent(event) {
   }
 
   await chrome.storage.local.set({ watchQueue: queue });
-  console.log(`[Drifter Sync] Event queued (${queue.length} total in queue).`);
+  console.log(`[Drifter Sync] [${event.source || "youtube"}] Event queued (${queue.length} in queue).`);
 
-  // Auto flush immediately on every new event so the dashboard stays live
+  // Auto flush immediately so the dashboard stays live
   flushQueueToBackend();
 }
 
@@ -89,14 +105,24 @@ async function flushQueueToBackend() {
   const backendUrl = data.backendUrl.replace(/\/$/, "");
   const syncToken = data.syncToken;
 
+  if (!syncToken) {
+    console.warn("[Drifter Sync] Sync skipped: No sync token configured.");
+    await chrome.storage.local.set({
+      lastSyncStatus: "FAILED",
+      lastSyncError: "No sync token configured. Open extension settings and paste your Drifter token.",
+    });
+    return {
+      success: false,
+      error: "No sync token configured. Please paste your token from the Drifter dashboard into extension settings.",
+    };
+  }
+
   const endpoint = `${backendUrl}/api/youtube-history`;
 
   const headers = {
     "Content-Type": "application/json",
+    "Authorization": `Bearer ${syncToken}`,
   };
-  if (syncToken) {
-    headers["Authorization"] = `Bearer ${syncToken}`;
-  }
 
   try {
     const response = await fetch(endpoint, {
@@ -107,6 +133,9 @@ async function flushQueueToBackend() {
 
     if (!response.ok) {
       const errText = await response.text();
+      if (response.status === 401) {
+        throw new Error("Invalid or expired sync token. Please re-copy your token from Drifter dashboard.");
+      }
       throw new Error(`HTTP ${response.status}: ${errText}`);
     }
 

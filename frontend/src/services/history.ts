@@ -8,7 +8,15 @@ const API_URL =
    TYPES
    ========================================================================== */
 
-export type HistorySource = "youtube" | "spotify";
+export type HistorySource =
+  | "youtube"
+  | "spotify"
+  | "github"
+  | "reddit"
+  | "netflix"
+  | "steam"
+  | "twitter"
+  | "browser";
 
 export interface HistoryEvent {
   id: number;
@@ -118,7 +126,7 @@ export async function getHistory(
 
 export async function importHistory(
   file: File,
-  source: "youtube" | "spotify",
+  source: HistorySource,
 ): Promise<HistoryImportResponse> {
   const formData = new FormData();
 

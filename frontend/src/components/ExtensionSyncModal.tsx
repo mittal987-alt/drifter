@@ -77,10 +77,10 @@ export default function ExtensionSyncModal({
             </div>
             <div>
               <h2 className="text-xl font-bold text-white tracking-wide">
-                YouTube Real-Time Sync Extension
+                Multi-Platform Real-Time Sync Extension
               </h2>
               <p className="text-xs text-neutral-400 mt-0.5">
-                Track watched videos in real-time as you watch them on YouTube
+                Automatically stream traces from YouTube, Spotify, Netflix, GitHub, Reddit, Steam & Web Browsing without exporting CSVs
               </p>
             </div>
           </div>
@@ -91,6 +91,28 @@ export default function ExtensionSyncModal({
           >
             <X size={20} />
           </button>
+        </div>
+
+        {/* Supported Platforms Pills */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+          <span className="text-[10px] uppercase tracking-wider text-white/40 font-mono mr-1">Active Sources:</span>
+          {[
+            { name: "YouTube", color: "text-red-400 border-red-500/20 bg-red-500/10" },
+            { name: "Spotify Web", color: "text-emerald-400 border-emerald-500/20 bg-emerald-500/10" },
+            { name: "GitHub Repos", color: "text-purple-400 border-purple-500/20 bg-purple-500/10" },
+            { name: "Reddit Threads", color: "text-orange-400 border-orange-500/20 bg-orange-500/10" },
+            { name: "Netflix Stream", color: "text-rose-400 border-rose-500/20 bg-rose-500/10" },
+            { name: "Steam Store", color: "text-sky-400 border-sky-500/20 bg-sky-500/10" },
+            { name: "X / Twitter", color: "text-sky-300 border-sky-400/20 bg-sky-400/10" },
+            { name: "Web Curiosity", color: "text-cyan-400 border-cyan-500/20 bg-cyan-500/10" },
+          ].map((item, idx) => (
+            <span
+              key={idx}
+              className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${item.color}`}
+            >
+              {item.name}
+            </span>
+          ))}
         </div>
 
         {/* Sync Token Card */}
@@ -205,7 +227,7 @@ export default function ExtensionSyncModal({
         <div className="flex items-center justify-between border-t border-white/10 pt-4 text-xs text-neutral-400">
           <div className="flex items-center gap-2">
             <ShieldCheck size={16} className="text-emerald-400" />
-            <span>Automatic deduplication & 20s watch threshold</span>
+            <span>Automatic deduplication & real-time tracking across YouTube, Spotify, Netflix, GitHub, Reddit, Steam & Web</span>
           </div>
 
           <button

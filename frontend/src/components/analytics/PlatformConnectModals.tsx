@@ -356,6 +356,16 @@ export function RedditConnectModal({
                 ))}
               </div>
 
+              <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 p-3 text-[11px] text-white/70 space-y-1.5">
+                <p className="font-semibold text-orange-300">OAuth Setup Notice</p>
+                <p className="leading-relaxed text-white/60">
+                  Direct OAuth requires registering an app at <a href="https://www.reddit.com/prefs/apps" target="_blank" rel="noreferrer" className="underline text-orange-300">reddit.com/prefs/apps</a> (set redirect URI to <code className="text-white/90">http://127.0.0.1:8000/api/reddit/callback</code>) and adding your keys to <code className="text-white/90">.env</code>.
+                </p>
+                <p className="text-[10px] text-white/40 pt-0.5">
+                  💡 Alternatively, the <strong>Drifter Chrome Extension</strong> syncs subreddits and threads automatically as you browse Reddit with <em>zero setup</em>.
+                </p>
+              </div>
+
               <ShimmerButton
                 onClick={connectReddit}
                 shimmerColor="#ff5722"
