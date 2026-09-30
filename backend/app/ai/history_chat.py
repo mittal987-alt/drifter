@@ -79,13 +79,14 @@ def answer_history_chat(
     rabbit_holes = behavior.get("rabbit_holes", [])
     time_of_day = behavior.get("time_of_day", {})
 
-    # Check for external LLM API keys if configured
+    # Check for external or local LLM (OpenAI, Gemini, or Ollama)
     openai_key = os.getenv("OPENAI_API_KEY")
     gemini_key = os.getenv("GEMINI_API_KEY")
+    ollama_enabled = os.getenv("OLLAMA_ENABLED", "").lower() in ("1", "true", "yes")
 
-    if (openai_key or gemini_key) and total_events > 0:
+    if (openai_key or gemini_key or ollama_enabled) and total_events > 0:
         try:
-            return _call_external_llm(question, chat_history, events, analysis, openai_key, gemini_key)
+            return _call_external_llm(question, chat_history, events, analysis, openai_key, gemini_key, ollama_enabled)
         except Exception:
             pass
 
@@ -112,6 +113,7 @@ def _call_external_llm(
     analysis: dict[str, Any],
     openai_key: str | None,
     gemini_key: str | None,
+    ollama_enabled: bool = False,
 ) -> dict[str, Any]:
     import httpx
 
@@ -131,6 +133,31 @@ def _call_external_llm(
         f"Recent 20 traces:\n" + "\n".join(recent_sample) + "\n\n"
         f"Answer the user's question accurately, concisely, and insightfully based on their data."
     )
+
+    # 1. Check Local Ollama first if enabled (100% private)
+    if ollama_enabled:
+        ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+        ollama_model = os.getenv("OLLAMA_MODEL", "llama3.2")
+        url = f"{ollama_host}/api/generate"
+        payload = {
+            "model": ollama_model,
+            "prompt": context_prompt + "\n\nUser Question: " + question,
+            "stream": False,
+        }
+        with httpx.Client(timeout=25.0) as client:
+            resp = client.post(url, json=payload)
+            if resp.status_code == 200:
+                reply = resp.json().get("response", "").strip()
+                if reply:
+                    return {
+                        "reply": reply,
+                        "suggested_queries": [
+                            "What is my fastest growing interest?",
+                            "Show me my late night rabbit holes",
+                            "When is my attention most focused?",
+                        ],
+                        "referenced_topics": [t.get("topic") for t in top_topics[:3]],
+                    }
 
     if gemini_key:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
@@ -181,6 +208,7 @@ def _call_external_llm(
                 }
 
     raise RuntimeError("External LLM not available")
+
 
 
 def _synthesize_local_response(

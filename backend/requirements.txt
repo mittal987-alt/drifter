@@ -13,3 +13,5 @@ sentence-transformers
 hdbscan
 scipy
 umap-learn
+alembic
+websockets

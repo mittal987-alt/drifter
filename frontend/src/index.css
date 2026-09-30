@@ -810,4 +810,75 @@ body.light .app-shell select {
 
 .animate-meteor {
   animation: meteor 5s linear infinite;
-}
+}
+
+/* =========================================================
+   PRINT STYLES (for PDF export)
+   ========================================================= */
+
+@media print {
+  /* Hide non-essential chrome when printing */
+  aside,
+  .mobile-nav-print-hide,
+  nav.fixed,
+  button,
+  [data-no-print] {
+    display: none !important;
+  }
+
+  body,
+  html {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+  }
+
+  .app-shell {
+    background: white !important;
+  }
+
+  /* Force all text to be visible on white */
+  * {
+    color: black !important;
+    border-color: #ddd !important;
+    background: transparent !important;
+  }
+
+  /* Make the main content full-width */
+  main {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Page breaks */
+  section {
+    page-break-inside: avoid;
+  }
+}
+
+/* =========================================================
+   MOBILE IMPROVEMENTS
+   ========================================================= */
+
+/* Safe-area padding for mobile bottom nav */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Prevent horizontal scroll on mobile */
+@media (max-width: 1023px) {
+  .app-shell {
+    overflow-x: hidden;
+  }
+}
+
+/* =========================================================
+   ACCESSIBILITY — better focus ring
+   ========================================================= */
+
+:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+

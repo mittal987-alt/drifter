@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import axios from "axios";
 import type { ReactNode } from "react";
 
@@ -7,6 +7,19 @@ import { AuthScreen } from "@/components/auth/AuthScreen";
 import { SpotifyChoiceModal } from "@/components/auth/SpotifyChoiceModal";
 import { useAuth } from "@/hooks/useAuth";
 import { authService } from "@/services/auth";
+import { useToast, registerToastFn } from "@/hooks/useToast";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { ToastContainer } from "@/components/ui/ToastContainer";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { SkeletonDashboard } from "@/components/ui/Skeleton";
+import { MobileNav } from "@/components/ui/MobileNav";
+import { DriftAlertBanner } from "@/components/ui/DriftAlertBanner";
+import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
+import { AnalysisProgressBar } from "@/components/ui/ProgressIndicator";
+import { exportAsJSON, exportTopicsCSV } from "@/services/export";
+import { KeyboardShortcutsModal } from "@/components/ui/KeyboardShortcutsModal";
+import { NotificationBell } from "@/components/ui/NotificationBell";
+import { SystemHealthModal } from "@/components/ui/SystemHealthModal";
 
 import {
   Activity,
@@ -15,6 +28,7 @@ import {
   CheckCircle2,
   Clock3,
   Database,
+  Download,
   History,
   Loader2,
   LogOut,
@@ -114,6 +128,16 @@ function App() {
     refreshAuth,
   } = useAuth();
 
+  /* -------------------------------------------------------------------------
+     TOAST SYSTEM
+     ------------------------------------------------------------------------- */
+  const { toasts, addToast, removeToast } = useToast();
+
+  // Register global toast fn so services and non-React code can fire toasts
+  useEffect(() => {
+    registerToastFn(addToast);
+  }, [addToast]);
+
   const [dashboard, setDashboard] =
     useState<DashboardData | null>(null);
 
@@ -160,6 +184,14 @@ function App() {
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     return (localStorage.getItem("drifter_theme") as "dark" | "light") || "dark";
   });
+
+  const [onboardingOpen, setOnboardingOpen] = useState<boolean>(() => {
+    return !localStorage.getItem("drifter_onboarding_done");
+  });
+
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
+  const [healthModalOpen, setHealthModalOpen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("drifter_theme", theme);
@@ -238,12 +270,14 @@ function App() {
       const data = await getDashboard(refresh);
 
       setDashboard(data);
+
+      if (refresh) {
+        addToast({ type: "success", title: "Analysis refreshed", message: "Your interest map is up to date." });
+      }
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to load dashboard.",
-      );
+      const msg = err instanceof Error ? err.message : "Failed to load dashboard.";
+      setError(msg);
+      addToast({ type: "error", title: "Failed to load", message: msg });
     } finally {
       setLoading(false);
     }
@@ -786,13 +820,16 @@ function App() {
     try {
       setSpotifySyncing(true);
       const res = await syncSpotifyHistory();
-      setSpotifySyncToast(res.message || `Synced ${res.imported} tracks successfully!`);
+      const msg = res.message || `Synced ${res.imported} tracks successfully!`;
+      setSpotifySyncToast(msg);
+      addToast({ type: "success", title: "Spotify synced", message: msg });
       setTimeout(() => setSpotifySyncToast(null), 5000);
       await refreshHistory();
       await loadDashboard(true);
     } catch (err: any) {
       const msg = err?.response?.data?.detail || "Failed to sync Spotify tracks. Please reconnect Spotify.";
       setSpotifySyncToast(`Spotify sync: ${msg}`);
+      addToast({ type: "error", title: "Spotify sync failed", message: msg });
       setTimeout(() => setSpotifySyncToast(null), 5000);
     } finally {
       setSpotifySyncing(false);
@@ -853,6 +890,28 @@ function App() {
   );
 
   /* ==========================================================================
+     KEYBOARD SHORTCUTS
+     ========================================================================== */
+
+  useKeyboardShortcuts([
+    { key: "1", handler: () => setActiveView("overview") },
+    { key: "2", handler: () => setActiveView("map") },
+    { key: "3", handler: () => setActiveView("evolution") },
+    { key: "4", handler: () => setActiveView("behavior") },
+    { key: "5", handler: () => setActiveView("history") },
+    { key: "6", handler: () => setActiveView("prediction") },
+    { key: "7", handler: () => setActiveView("correlation") },
+    { key: "8", handler: () => setActiveView("dna") },
+    { key: "r", handler: () => loadDashboard(true) },
+    { key: "i", handler: () => { setImportSource("youtube"); setImportOpen(true); } },
+    { key: "c", handler: () => setChatOpen(true) },
+    { key: "w", handler: () => setWrappedOpen(true) },
+    { key: "t", handler: () => setTheme((t) => (t === "dark" ? "light" : "dark")) },
+    { key: "?", handler: () => setShortcutsModalOpen((o) => !o) },
+    { key: "h", handler: () => setHealthModalOpen((o) => !o) },
+  ]);
+
+  /* ==========================================================================
      AUTHENTICATION
      ========================================================================== */
 
@@ -898,33 +957,13 @@ function App() {
 
   if (loading) {
     return (
-      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#050505] text-white">
-
-        <Spotlight />
-
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.05),transparent_50%)]" />
-
-        <div className="relative z-10 flex flex-col items-center">
-
-          <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] shadow-2xl">
-
-            <Activity
-              size={24}
-              className="animate-pulse"
-            />
-
-          </div>
-
-          <p className="text-sm text-white/50">
-            Analyzing your interests...
-          </p>
-
-          <div className="mt-5 h-px w-40 overflow-hidden bg-white/10">
-
-            <div className="h-full w-1/2 animate-[loading_1.2s_ease-in-out_infinite] bg-white" />
-
-          </div>
-
+      <div className="min-h-screen bg-[#050505] text-white">
+        <div className="relative mx-auto flex min-h-screen max-w-[1600px]">
+          {/* Skeleton sidebar */}
+          <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-white/[0.06] lg:block" />
+          <main className="min-w-0 flex-1 px-5 py-6 sm:px-8 lg:px-12 lg:py-10">
+            <SkeletonDashboard />
+          </main>
         </div>
       </div>
     );
@@ -1140,13 +1179,32 @@ function App() {
   return (
     <div className="app-shell min-h-screen bg-[#050505] text-white">
 
+      {/* GLOBAL UTILITIES */}
+      <AnalysisProgressBar />
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+
+      {/* ONBOARDING — only shown to new users with no data */}
+      {onboardingOpen && dashboard && dashboard.overview.events === 0 && (
+        <OnboardingWizard
+          onDismiss={() => {
+            localStorage.setItem("drifter_onboarding_done", "1");
+            setOnboardingOpen(false);
+          }}
+          onImport={() => { setImportSource("youtube"); setImportOpen(true); setImportResult(null); setImportError(null); }}
+          onExtension={() => setExtensionModalOpen(true)}
+        />
+      )}
+
       {/* GLOBAL BACKGROUND */}
 
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(255,255,255,0.06),transparent_45%)]" />
 
       <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.018)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.018)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:linear-gradient(to_bottom,black,transparent_80%)]" />
 
-      <div className="relative mx-auto flex min-h-screen max-w-[1600px]">
+      {/* MOBILE NAV */}
+      <MobileNav activeView={activeView} onNavigate={setActiveView} />
+
+      <div className="relative mx-auto flex min-h-screen max-w-[1600px] pb-20 lg:pb-0">
 
         {/* SIDEBAR */}
 
@@ -1279,13 +1337,14 @@ function App() {
 
           <div className="mt-auto border-t border-white/[0.06] pt-5">
 
-            <div className="flex items-center gap-2 text-xs text-white/35">
-
-              <span className="h-1.5 w-1.5 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)]" />
-
-              Analytics online
-
-            </div>
+            <button
+              onClick={() => setHealthModalOpen(true)}
+              className="flex items-center gap-2 text-xs text-white/40 transition hover:text-white group cursor-pointer"
+              title="View system & engine diagnostics (H)"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" />
+              <span className="group-hover:underline">Analytics online</span>
+            </button>
 
           </div>
 
@@ -1357,6 +1416,9 @@ function App() {
             </section>
 
           </BlurFade>
+
+          {/* DRIFT ALERTS */}
+          {dashboard && <DriftAlertBanner data={dashboard} />}
 
           {/* HEADER ACTIONS */}
 
@@ -1459,6 +1521,39 @@ function App() {
               Import history
             </button>
 
+            {/* EXPORT MENU */}
+            <div className="relative">
+              <button
+                onClick={() => setExportMenuOpen((o) => !o)}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-xs font-medium text-white/70 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+              >
+                <Download size={14} />
+                Export
+              </button>
+              {exportMenuOpen && dashboard && (
+                <div className="absolute right-0 top-12 z-50 w-48 rounded-xl border border-white/10 bg-[#0f0f0f] shadow-2xl">
+                  <button
+                    onClick={() => { exportAsJSON(dashboard); setExportMenuOpen(false); }}
+                    className="flex w-full items-center gap-2 px-4 py-3 text-xs text-white/70 transition hover:bg-white/[0.04] hover:text-white"
+                  >
+                    <Download size={13} /> Export as JSON
+                  </button>
+                  <button
+                    onClick={() => { exportTopicsCSV(dashboard.top_topics); setExportMenuOpen(false); }}
+                    className="flex w-full items-center gap-2 px-4 py-3 text-xs text-white/70 transition hover:bg-white/[0.04] hover:text-white"
+                  >
+                    <Download size={13} /> Export Topics CSV
+                  </button>
+                  <button
+                    onClick={() => { window.print(); setExportMenuOpen(false); }}
+                    className="flex w-full items-center gap-2 rounded-b-xl px-4 py-3 text-xs text-white/70 transition hover:bg-white/[0.04] hover:text-white"
+                  >
+                    <Download size={13} /> Print / Save as PDF
+                  </button>
+                </div>
+              )}
+            </div>
+
             <button
               onClick={authService.connectGoogleDataPortability}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-xs font-medium text-white/70 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
@@ -1493,6 +1588,17 @@ function App() {
 
               Refresh analysis
 
+            </button>
+
+            <NotificationBell />
+
+            <button
+              onClick={() => setShortcutsModalOpen(true)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+              title="Keyboard Shortcuts (?)"
+              aria-label="Keyboard Shortcuts"
+            >
+              <span className="font-mono text-xs font-bold">?</span>
             </button>
 
             <button
@@ -1534,7 +1640,7 @@ function App() {
 
           {activeView === "overview" ? (
             <>
-
+              <ErrorBoundary fallbackTitle="Overview failed to load">
               <OverviewView
                 dashboard={dashboard}
                 history={history}
@@ -1554,6 +1660,7 @@ function App() {
                 onOpenExtension={() => setExtensionModalOpen(true)}
                 onConnectSpotify={handleSpotifyConnectClick}
               />
+              </ErrorBoundary>
 
 
               {/* LEGACY OVERVIEW */}
@@ -2168,88 +2275,46 @@ function App() {
           ) : (
             <div className="workspace-shell">
 
-              {activeView ===
-                "map" && (
-                <MapView
-                  dashboard={
-                    dashboard
-                  }
-                  history={history}
-                  historyLoading={
-                    historyLoading
-                  }
-                  onOpenView={
-                    setActiveView
-                  }
-                />
+              {activeView === "map" && (
+                <ErrorBoundary fallbackTitle="Interest Map failed to load">
+                  <MapView dashboard={dashboard} history={history} historyLoading={historyLoading} onOpenView={setActiveView} />
+                </ErrorBoundary>
               )}
 
-              {activeView ===
-                "evolution" && (
-                <EvolutionView
-                  dashboard={
-                    dashboard
-                  }
-                  history={history}
-                  historyLoading={
-                    historyLoading
-                  }
-                  onOpenView={
-                    setActiveView
-                  }
-                />
+              {activeView === "evolution" && (
+                <ErrorBoundary fallbackTitle="Evolution view failed to load">
+                  <EvolutionView dashboard={dashboard} history={history} historyLoading={historyLoading} onOpenView={setActiveView} />
+                </ErrorBoundary>
               )}
 
-              {activeView ===
-                "behavior" && (
-                <BehaviorView
-                  dashboard={
-                    dashboard
-                  }
-                  history={history}
-                  historyLoading={
-                    historyLoading
-                  }
-                  onOpenView={
-                    setActiveView
-                  }
-                />
+              {activeView === "behavior" && (
+                <ErrorBoundary fallbackTitle="Behavior view failed to load">
+                  <BehaviorView dashboard={dashboard} history={history} historyLoading={historyLoading} onOpenView={setActiveView} />
+                </ErrorBoundary>
               )}
 
-              {activeView ===
-                "history" && (
-                <HistoryView
-                  dashboard={
-                    dashboard
-                  }
-                  history={history}
-                  historyLoading={
-                    historyLoading
-                  }
-                  onOpenView={
-                    setActiveView
-                  }
-                  onRefresh={refreshHistory}
-                />
+              {activeView === "history" && (
+                <ErrorBoundary fallbackTitle="History view failed to load">
+                  <HistoryView dashboard={dashboard} history={history} historyLoading={historyLoading} onOpenView={setActiveView} onRefresh={refreshHistory} />
+                </ErrorBoundary>
               )}
 
-              {activeView ===
-                "prediction" && (
-                <PredictionWorkspaceView
-                  source={importSource}
-                />
+              {activeView === "prediction" && (
+                <ErrorBoundary fallbackTitle="Prediction view failed to load">
+                  <PredictionWorkspaceView source={importSource} />
+                </ErrorBoundary>
               )}
 
-              {activeView ===
-                "correlation" && (
-                <CorrelationWorkspaceView />
+              {activeView === "correlation" && (
+                <ErrorBoundary fallbackTitle="Correlation view failed to load">
+                  <CorrelationWorkspaceView />
+                </ErrorBoundary>
               )}
 
-              {activeView ===
-                "dna" && (
-                <DnaWorkspaceView
-                  source={importSource}
-                />
+              {activeView === "dna" && (
+                <ErrorBoundary fallbackTitle="Interest DNA view failed to load">
+                  <DnaWorkspaceView source={importSource} />
+                </ErrorBoundary>
               )}
 
             </div>
@@ -2289,6 +2354,22 @@ function App() {
             }
             user={auth?.user}
             onLogout={logout}
+          />
+
+          <KeyboardShortcutsModal
+            isOpen={shortcutsModalOpen}
+            onClose={() => setShortcutsModalOpen(false)}
+          />
+
+          <SystemHealthModal
+            isOpen={healthModalOpen}
+            onClose={() => setHealthModalOpen(false)}
+            connectedProviders={{
+              youtube: isConnected("youtube"),
+              spotify: isConnected("spotify"),
+              github: isConnected("github"),
+              reddit: isConnected("reddit"),
+            }}
           />
 
         </main>

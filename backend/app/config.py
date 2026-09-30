@@ -54,6 +54,11 @@ class Settings:
         "sqlite:///./year_in_drift.db",
     )
 
+    REDIS_URL = os.getenv(
+        "REDIS_URL",
+        "redis://localhost:6379/0",
+    )
+
     SESSION_SECRET = os.getenv(
         "SESSION_SECRET",
         "change-me",

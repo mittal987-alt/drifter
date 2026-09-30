@@ -1,9 +1,20 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+import logging
+import sys
 
 from app.config import settings
+
+# Structured logging
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 # API Routers
 from app.api.auth import router as auth_router
@@ -15,6 +26,7 @@ from app.api.google_history import router as google_history_router
 from app.api.history_extension_api import router as history_extension_router
 from app.api.github_api import router as github_router
 from app.api.reddit_api import router as reddit_router
+from app.api.websocket import router as websocket_router
 
 # Database
 from sqlalchemy import inspect, text
@@ -191,6 +203,9 @@ app.include_router(
     tags=["Reddit"],
 )
 
+# WebSocket
+app.include_router(websocket_router, tags=["WebSocket"])
+
 
 # ============================================================
 # ROOT ENDPOINT
@@ -211,9 +226,48 @@ def root():
 
 @app.get("/health")
 def health():
+    from app.services.cache import cache
+    import os
+    db_status = "ok"
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception as exc:
+        db_status = f"error: {str(exc)}"
+
     return {
-        "status": "healthy",
+        "status": "healthy" if db_status == "ok" else "degraded",
+        "database": {
+            "type": "sqlite" if settings.DATABASE_URL.startswith("sqlite") else "postgresql",
+            "status": db_status,
+        },
+        "llm": {
+            "gemini": bool(os.getenv("GEMINI_API_KEY")),
+            "openai": bool(os.getenv("OPENAI_API_KEY")),
+            "ollama": os.getenv("OLLAMA_ENABLED", "").lower() in ("1", "true", "yes"),
+        },
+        "providers_configured": {
+            "youtube": bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET),
+            "spotify": bool(settings.SPOTIFY_CLIENT_ID and settings.SPOTIFY_CLIENT_SECRET),
+            "github": bool(settings.GITHUB_CLIENT_ID and settings.GITHUB_CLIENT_SECRET),
+            "reddit": bool(settings.REDDIT_CLIENT_ID and settings.REDDIT_CLIENT_SECRET),
+        },
+        "cache_entries": cache.size,
     }
+
+
+
+# ============================================================
+# CACHE MANAGEMENT
+# ============================================================
+
+@app.delete("/api/cache/clear")
+def clear_cache():
+    """Invalidate all cached analysis results."""
+    from app.services.cache import cache
+    cache.clear()
+    logger.info("Cache cleared via API")
+    return {"status": "cleared"}
 
 
 # ============================================================

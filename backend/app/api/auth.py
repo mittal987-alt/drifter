@@ -21,8 +21,12 @@ from app.database.models import PortabilityExportJob
 from app.services.google_service import (
     GOOGLE_DATA_PORTABILITY_YOUTUBE_SCOPE,
     initiate_youtube_history_export,
+    refresh_google_token,
 )
-from app.services.spotify_service import sync_spotify_user_history
+from app.services.spotify_service import (
+    sync_spotify_user_history,
+    refresh_spotify_token,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -840,3 +844,51 @@ def signout(request: Request):
         "success": True,
         "message": "Signed out successfully.",
     }
+
+
+# ---------------------------------------------------------
+# Auto-refresh all OAuth connections
+# ---------------------------------------------------------
+
+@router.post("/refresh-all")
+async def refresh_all_tokens(
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """
+    Check and refresh expired or near-expiry tokens for all providers for the current user.
+    """
+    connections = db.query(Connection).filter(Connection.user_id == user_id).all()
+    results = {}
+
+    for conn in connections:
+        needs_refresh = (
+            conn.expires_at is not None
+            and conn.expires_at <= datetime.utcnow() + timedelta(minutes=10)
+            and conn.refresh_token is not None
+        )
+
+        if not needs_refresh:
+            results[conn.provider] = "valid"
+            continue
+
+        try:
+            if conn.provider == "spotify":
+                tokens = await refresh_spotify_token(conn.refresh_token)
+                conn.access_token = tokens["access_token"]
+                conn.expires_at = datetime.utcnow() + timedelta(seconds=tokens.get("expires_in", 3600))
+                if tokens.get("refresh_token"):
+                    conn.refresh_token = tokens["refresh_token"]
+                results[conn.provider] = "refreshed"
+            elif conn.provider in ("youtube", "google"):
+                tokens = await refresh_google_token(conn.refresh_token)
+                conn.access_token = tokens["access_token"]
+                conn.expires_at = datetime.utcnow() + timedelta(seconds=tokens.get("expires_in", 3600))
+                results[conn.provider] = "refreshed"
+            else:
+                results[conn.provider] = "skipped"
+        except Exception as exc:
+            results[conn.provider] = f"error: {str(exc)}"
+
+    db.commit()
+    return {"status": "ok", "providers": results}

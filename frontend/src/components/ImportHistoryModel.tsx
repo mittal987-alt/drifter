@@ -323,17 +323,18 @@ export default function ImportHistoryModal({
           {!file && (
             <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-[11px] text-white/40 leading-relaxed">
               {source === "youtube" && (
-                <>📦 Get your YouTube history at <a href="https://takeout.google.com" target="_blank" rel="noreferrer" className="underline text-white/60 hover:text-white">takeout.google.com</a> — select &ldquo;YouTube and YouTube Music&rdquo; → History.</>  
+                <>📦 Get your YouTube history at <a href="https://takeout.google.com" target="_blank" rel="noopener noreferrer" className="underline text-white/60 hover:text-white">takeout.google.com</a> — select &ldquo;YouTube and YouTube Music&rdquo; → History.</>  
               )}
               {source === "spotify" && (
-                <>📦 Request at <a href="https://www.spotify.com/account/privacy/" target="_blank" rel="noreferrer" className="underline text-white/60 hover:text-white">spotify.com/account/privacy</a> → Download your data → Extended streaming history (JSON/CSV).</>  
+                <>📦 Request at <a href="https://www.spotify.com/account/privacy/" target="_blank" rel="noopener noreferrer" className="underline text-white/60 hover:text-white">spotify.com/account/privacy</a> → Download your data → Extended streaming history (JSON/CSV).</>  
               )}
               {source === "twitter" && (
-                <>📦 Request your archive at <a href="https://twitter.com/settings/download_your_data" target="_blank" rel="noreferrer" className="underline text-white/60 hover:text-white">Settings → Your Account → Download archive</a>. Upload the <code className="text-white/70">tweet.js</code> or HTML files.</>  
+                <>📦 Request your archive at <a href="https://twitter.com/settings/download_your_data" target="_blank" rel="noopener noreferrer" className="underline text-white/60 hover:text-white">Settings → Your Account → Download archive</a>. Upload the <code className="text-white/70">tweet.js</code> or HTML files.</>  
               )}
               {source === "netflix" && (
-                <>📦 Download at <a href="https://www.netflix.com/account/getmyinfo" target="_blank" rel="noreferrer" className="underline text-white/60 hover:text-white">netflix.com/account</a> → &ldquo;Get my info&rdquo; → ViewingActivity. Upload <code className="text-white/70">NetflixViewingHistory.csv</code>.</>  
+                <>📦 Download at <a href="https://www.netflix.com/account/getmyinfo" target="_blank" rel="noopener noreferrer" className="underline text-white/60 hover:text-white">netflix.com/account</a> → &ldquo;Get my info&rdquo; → ViewingActivity. Upload <code className="text-white/70">NetflixViewingHistory.csv</code>.</>  
               )}
+
               {source === "reddit" && (
                 <>📦 Or use the <strong className="text-white/60">Drifter Extension</strong> which auto-tracks Reddit threads you browse — zero CSV setup needed.</>  
               )}

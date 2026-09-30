@@ -100,8 +100,9 @@ def _call_llm_for_cluster_label(representative_titles: list[str]) -> str | None:
     """
     gemini_key = os.getenv("GEMINI_API_KEY")
     openai_key = os.getenv("OPENAI_API_KEY")
+    ollama_enabled = os.getenv("OLLAMA_ENABLED", "").lower() in ("1", "true", "yes")
 
-    if not (gemini_key or openai_key) or not representative_titles:
+    if not (gemini_key or openai_key or ollama_enabled) or not representative_titles:
         return None
 
     titles_text = "\n".join(f"- {t}" for t in representative_titles[:8])
@@ -114,6 +115,23 @@ def _call_llm_for_cluster_label(representative_titles: list[str]) -> str | None:
 
     try:
         import httpx
+
+        if ollama_enabled:
+            ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+            ollama_model = os.getenv("OLLAMA_MODEL", "llama3.2")
+            url = f"{ollama_host}/api/generate"
+            payload = {
+                "model": ollama_model,
+                "prompt": prompt,
+                "stream": False,
+            }
+            with httpx.Client(timeout=10.0) as client:
+                resp = client.post(url, json=payload)
+                if resp.status_code == 200:
+                    candidate = resp.json().get("response", "").strip()
+                    clean = re.sub(r'["\'.]', '', candidate).strip()
+                    if clean and 2 <= len(clean.split()) <= 5 and "error" not in clean.lower():
+                        return clean.title()
 
         if gemini_key:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"

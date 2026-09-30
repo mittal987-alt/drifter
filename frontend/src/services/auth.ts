@@ -78,6 +78,15 @@ export const authService = {
       `${API_URL}/api/auth/spotify/login`;
   },
 
+  async refreshAllTokens(): Promise<{ status: string; providers: Record<string, string> }> {
+    const response = await axios.post(
+      `${API_URL}/api/auth/refresh-all`,
+      {},
+      { withCredentials: true }
+    );
+    return response.data;
+  },
+
   getApiUrl(): string {
     return API_URL;
   },
