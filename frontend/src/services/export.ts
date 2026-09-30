@@ -28,12 +28,13 @@ export function exportAsJSON(data: DashboardData) {
 /**
  * Trigger print dialog as capture fallback.
  */
-export function exportElementAsPNG(
+export async function exportElementAsPNG(
   _selector?: string,
   _filename = "drifter-capture.png"
 ) {
   window.print();
 }
+
 
 
 /**
