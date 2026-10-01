@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import axios from "axios";
+import { apiClient } from "@/services/api";
 import type { ReactNode } from "react";
 
 import { AuthLoading } from "@/components/auth/AuthLoading";
@@ -312,16 +313,9 @@ function App() {
         importSource,
       );
 
-      const apiUrl =
-        import.meta.env.VITE_API_URL ||
-        "http://127.0.0.1:8000";
-
-      const response = await axios.post(
-        `${apiUrl}/api/history/import?source=${encodeURIComponent(importSource)}`,
-        formData,
-        {
-          withCredentials: true,
-        },
+      const response = await apiClient.post(
+        `/api/history/import?source=${encodeURIComponent(importSource)}`,
+        formData
       );
 
       const imported =

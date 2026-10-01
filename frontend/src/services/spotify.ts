@@ -1,8 +1,4 @@
-import axios from "axios";
-
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  "http://127.0.0.1:8000";
+import { apiClient } from "./api";
 
 export interface SpotifySyncResponse {
   status: string;
@@ -13,27 +9,17 @@ export interface SpotifySyncResponse {
 }
 
 export async function syncSpotifyHistory(): Promise<SpotifySyncResponse> {
-  const response = await axios.post<SpotifySyncResponse>(
-    `${API_URL}/api/spotify/sync`,
-    {},
-    { withCredentials: true },
-  );
+  const response = await apiClient.post<SpotifySyncResponse>("/api/spotify/sync", {});
   return response.data;
 }
 
 export async function getSpotifyProfile(): Promise<any> {
-  const response = await axios.get(
-    `${API_URL}/api/spotify/profile`,
-    { withCredentials: true },
-  );
+  const response = await apiClient.get("/api/spotify/profile");
   return response.data;
 }
 
 export async function getSpotifyRecent(limit = 20): Promise<any> {
-  const response = await axios.get(
-    `${API_URL}/api/spotify/recent`,
-    { params: { limit }, withCredentials: true },
-  );
+  const response = await apiClient.get("/api/spotify/recent", { params: { limit } });
   return response.data;
 }
 
@@ -42,3 +28,4 @@ export const spotifyService = {
   getSpotifyProfile,
   getSpotifyRecent,
 };
+

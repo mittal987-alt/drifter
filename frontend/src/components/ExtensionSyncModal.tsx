@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import { apiClient } from "@/services/api";
 import {
   Check,
   Puzzle,
@@ -17,8 +17,6 @@ interface ExtensionSyncModalProps {
   open: boolean;
   onClose: () => void;
 }
-
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 export default function ExtensionSyncModal({
   open,
@@ -39,9 +37,8 @@ export default function ExtensionSyncModal({
     try {
       setLoadingToken(true);
       setError(null);
-      const response = await axios.get<{ token: string }>(
-        `${API_URL}/api/auth/extension-token`,
-        { withCredentials: true }
+      const response = await apiClient.get<{ token: string }>(
+        "/api/auth/extension-token"
       );
       setToken(response.data.token);
     } catch (err) {

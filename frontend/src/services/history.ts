@@ -1,8 +1,4 @@
-import axios from "axios";
-
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  "http://127.0.0.1:8000";
+import { apiClient } from "./api";
 
 /* ==========================================================================
    TYPES
@@ -55,14 +51,6 @@ export interface GoogleExportStatus {
 
   job_id: number;
 
-  /*
-   * Backend status.
-   *
-   * IN_PROGRESS
-   * PROCESSING
-   * READY
-   * FAILED
-   */
   status:
     | "IN_PROGRESS"
     | "PROCESSING"
@@ -92,31 +80,16 @@ export async function getHistory(
   source?: string,
   limit = 1000,
 ): Promise<HistoryEvent[]> {
-  const response =
-    await axios.get<HistoryResponse>(
-      `${API_URL}/api/history/events`,
-      {
-        params: {
-          ...(source
-            ? { source }
-            : {}),
-          limit,
-        },
-
-        withCredentials: true,
+  const response = await apiClient.get<HistoryResponse>(
+    "/api/history/events",
+    {
+      params: {
+        ...(source ? { source } : {}),
+        limit,
       },
-    );
+    },
+  );
 
-  /*
-   * Backend returns:
-   *
-   * {
-   *   count: number,
-   *   events: [...]
-   * }
-   *
-   * The React application expects only the array.
-   */
   return response.data.events;
 }
 
@@ -130,24 +103,13 @@ export async function importHistory(
 ): Promise<HistoryImportResponse> {
   const formData = new FormData();
 
-  formData.append(
-    "file",
-    file,
-  );
+  formData.append("file", file);
+  formData.append("source", source);
 
-  formData.append(
-    "source",
-    source,
+  const response = await apiClient.post<HistoryImportResponse>(
+    "/api/history/import",
+    formData
   );
-
-  const response =
-    await axios.post<HistoryImportResponse>(
-      `${API_URL}/api/history/import`,
-      formData,
-      {
-        withCredentials: true,
-      },
-    );
 
   return response.data;
 }
@@ -159,13 +121,9 @@ export async function importHistory(
 export async function getGoogleExportStatus(
   jobId: number,
 ): Promise<GoogleExportStatus> {
-  const response =
-    await axios.get<GoogleExportStatus>(
-      `${API_URL}/api/youtube/data-portability/status/${jobId}`,
-      {
-        withCredentials: true,
-      },
-    );
+  const response = await apiClient.get<GoogleExportStatus>(
+    `/api/youtube/data-portability/status/${jobId}`
+  );
 
   return response.data;
 }
@@ -175,13 +133,9 @@ export async function getGoogleExportStatus(
    ========================================================================== */
 
 export async function getLatestGoogleExportStatus(): Promise<GoogleExportStatus> {
-  const response =
-    await axios.get<GoogleExportStatus>(
-      `${API_URL}/api/youtube/data-portability/status/latest`,
-      {
-        withCredentials: true,
-      },
-    );
+  const response = await apiClient.get<GoogleExportStatus>(
+    "/api/youtube/data-portability/status/latest"
+  );
 
   return response.data;
 }
@@ -193,9 +147,8 @@ export async function getLatestGoogleExportStatus(): Promise<GoogleExportStatus>
 export async function deleteHistoryEvent(
   eventId: number,
 ): Promise<{ success: boolean; event_id: number; message: string }> {
-  const response = await axios.delete<{ success: boolean; event_id: number; message: string }>(
-    `${API_URL}/api/history/events/${eventId}`,
-    { withCredentials: true },
+  const response = await apiClient.delete<{ success: boolean; event_id: number; message: string }>(
+    `/api/history/events/${eventId}`
   );
   return response.data;
 }
@@ -207,11 +160,10 @@ export async function deleteHistoryEvent(
 export async function clearHistory(
   source?: string,
 ): Promise<{ success: boolean; deleted: number; source?: string }> {
-  const response = await axios.delete<{ success: boolean; deleted: number; source?: string }>(
-    `${API_URL}/api/history/clear`,
+  const response = await apiClient.delete<{ success: boolean; deleted: number; source?: string }>(
+    "/api/history/clear",
     {
       params: source ? { source } : {},
-      withCredentials: true,
     },
   );
   return response.data;
@@ -228,4 +180,4 @@ export const historyService = {
   getLatestGoogleExportStatus,
   deleteHistoryEvent,
   clearHistory,
-};
+};

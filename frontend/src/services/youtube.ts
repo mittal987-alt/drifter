@@ -1,8 +1,4 @@
-import axios from "axios";
-
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  "http://localhost:8000";
+import { apiClient } from "./api";
 
 export interface GoogleExportStatus {
   success: boolean;
@@ -19,17 +15,13 @@ export interface GoogleExportStatus {
 export async function getGoogleExportStatus(
   jobId: number,
 ): Promise<GoogleExportStatus> {
-  const response =
-    await axios.get<GoogleExportStatus>(
-      `${API_URL}/api/youtube/data-portability/status/${jobId}`,
-      {
-        withCredentials: true,
-      },
-    );
+  const response = await apiClient.get<GoogleExportStatus>(
+    `/api/youtube/data-portability/status/${jobId}`
+  );
 
   return response.data;
 }
 
 export const youtubeService = {
   getGoogleExportStatus,
-};
+};

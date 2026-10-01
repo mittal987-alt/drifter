@@ -1,13 +1,12 @@
-const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+import { apiClient, API_URL } from "./api";
 
 export async function getRedditStatus(): Promise<{ connected: boolean; connected_at: string | null }> {
-  const resp = await fetch(`${API}/api/reddit/status`, { credentials: "include" });
-  if (!resp.ok) throw new Error("Failed to get Reddit status");
-  return resp.json();
+  const resp = await apiClient.get("/api/reddit/status");
+  return resp.data;
 }
 
 export function connectReddit() {
-  window.location.href = `${API}/api/reddit/login`;
+  window.location.href = `${API_URL}/api/reddit/login`;
 }
 
 export async function syncReddit(): Promise<{
@@ -16,17 +15,11 @@ export async function syncReddit(): Promise<{
   total: number;
   message: string;
 }> {
-  const resp = await fetch(`${API}/api/reddit/sync`, {
-    method: "POST",
-    credentials: "include",
-  });
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({ detail: "Sync failed" }));
-    throw new Error(err.detail || "Reddit sync failed");
-  }
-  return resp.json();
+  const resp = await apiClient.post("/api/reddit/sync", {});
+  return resp.data;
 }
 
 export async function disconnectReddit(): Promise<void> {
-  await fetch(`${API}/api/reddit/disconnect`, { method: "DELETE", credentials: "include" });
+  await apiClient.delete("/api/reddit/disconnect");
 }
+

@@ -1,8 +1,4 @@
-import axios from "axios";
-
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  "http://127.0.0.1:8000";
+import { apiClient } from "./api";
 
 export interface Topic {
   id: number;
@@ -136,13 +132,12 @@ export interface DashboardData {
 export async function getDashboard(
   refresh = false,
 ): Promise<DashboardData> {
-  const response = await axios.get<DashboardData>(
-    `${API_URL}/api/analytics/dashboard`,
+  const response = await apiClient.get<DashboardData>(
+    "/api/analytics/dashboard",
     {
       params: {
         refresh,
       },
-      withCredentials: true,
     },
   );
 
@@ -152,13 +147,12 @@ export async function getDashboard(
 export async function getInterests(
   refresh = false,
 ) {
-  const response = await axios.get(
-    `${API_URL}/api/analytics/interests`,
+  const response = await apiClient.get(
+    "/api/analytics/interests",
     {
       params: {
         refresh,
       },
-      withCredentials: true,
     },
   );
 
@@ -168,14 +162,13 @@ export async function getInterests(
 export async function triggerAnalysis(
   source?: string,
 ) {
-  const response = await axios.post(
-    `${API_URL}/api/analytics/trigger`,
+  const response = await apiClient.post(
+    "/api/analytics/trigger",
     null,
     {
       params: {
         source,
       },
-      withCredentials: true,
     },
   );
 
@@ -197,10 +190,9 @@ export async function chatWithHistory(
   history?: { role: string; content: string }[],
   source?: string,
 ): Promise<ChatResponse> {
-  const response = await axios.post<ChatResponse>(
-    `${API_URL}/api/analytics/chat`,
+  const response = await apiClient.post<ChatResponse>(
+    "/api/analytics/chat",
     { message, history, source },
-    { withCredentials: true },
   );
   return response.data;
 }
@@ -240,9 +232,9 @@ export interface WrappedData {
 }
 
 export async function getYearInDrift(source?: string): Promise<WrappedData> {
-  const response = await axios.get<WrappedData>(
-    `${API_URL}/api/analytics/wrapped`,
-    { params: { source }, withCredentials: true },
+  const response = await apiClient.get<WrappedData>(
+    "/api/analytics/wrapped",
+    { params: { source } },
   );
   return response.data;
 }
@@ -264,9 +256,9 @@ export interface PredictionData {
 }
 
 export async function getInterestPredictions(source?: string): Promise<PredictionData> {
-  const response = await axios.get<PredictionData>(
-    `${API_URL}/api/analytics/predictions`,
-    { params: { source }, withCredentials: true },
+  const response = await apiClient.get<PredictionData>(
+    "/api/analytics/predictions",
+    { params: { source } },
   );
   return response.data;
 }
@@ -309,9 +301,8 @@ export interface CorrelationData {
 }
 
 export async function getPlatformCorrelation(): Promise<CorrelationData> {
-  const response = await axios.get<CorrelationData>(
-    `${API_URL}/api/analytics/correlation`,
-    { withCredentials: true },
+  const response = await apiClient.get<CorrelationData>(
+    "/api/analytics/correlation",
   );
   return response.data;
 }
@@ -343,9 +334,9 @@ export interface InterestDnaData {
 }
 
 export async function getInterestDna(source?: string): Promise<InterestDnaData> {
-  const response = await axios.get<InterestDnaData>(
-    `${API_URL}/api/analytics/dna`,
-    { params: { source }, withCredentials: true },
+  const response = await apiClient.get<InterestDnaData>(
+    "/api/analytics/dna",
+    { params: { source } },
   );
   return response.data;
 }
