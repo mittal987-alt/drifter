@@ -82,6 +82,12 @@ def init_db():
                     conn.execute(text(f"ALTER TABLE history_events ADD COLUMN {col_name} {col_type}"))
                     conn.commit()
 
+        if "history_events" in tables:
+            columns = [c["name"] for c in inspector.get_columns("history_events")]
+            if "topic" in columns:
+                conn.execute(text("UPDATE history_events SET topic = 'Google Meet' WHERE topic LIKE 'Meet%' OR topic LIKE '%Google Meet%' OR title LIKE '%meet.google%' OR title LIKE 'Meet -%' OR title LIKE 'Meet –%'"))
+                conn.commit()
+
         if "analysis_results" in tables:
             columns = [c["name"] for c in inspector.get_columns("analysis_results")]
             for col_name, col_type in [
@@ -92,6 +98,8 @@ def init_db():
                     conn.execute(text(f"ALTER TABLE analysis_results ADD COLUMN {col_name} {col_type}"))
                     conn.commit()
             conn.execute(text("UPDATE analysis_results SET status = 'READY' WHERE status IS NULL"))
+            # Invalidate stale cached analysis results so fresh topic normalization applies immediately
+            conn.execute(text("DELETE FROM analysis_results"))
             conn.commit()
 
         if "portability_export_jobs" in tables:

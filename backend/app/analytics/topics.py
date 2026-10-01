@@ -24,7 +24,9 @@ EXTRA_STOP_WORDS = {
 ALL_STOP_WORDS = list(ENGLISH_STOP_WORDS.union(EXTRA_STOP_WORDS))
 
 # Smart category mappings for clean human-readable titles
+# Smart category mappings for clean human-readable titles
 CATEGORY_MAPPINGS = [
+    (re.compile(r"\b(meet\.google|google meet|meet|zoom|teams|webex|conference call|meeting)\b", re.I), "Google Meet"),
     (re.compile(r"\b(azure|aws|gcp|cloud|scale|devops|docker|k8s|kubernetes|server|database|sql)\b", re.I), "Cloud & Infrastructure"),
     (re.compile(r"\b(finance|credit|invest|stocks?|trading|crypto|bank|money|upstox|slice|commerce|shopping|bonds|price|graph)\b", re.I), "Finance & Investing"),
     (re.compile(r"\b(ai|llm|gpt|gemini|openai|agents?|python|py|coding|react|javascript|typescript|software|developer|machine learning|classroom|code|ch|p6|0s|ag)\b", re.I), "AI & Software Engineering"),
@@ -37,6 +39,17 @@ CATEGORY_MAPPINGS = [
 ]
 
 ASPECT_RATIO_RE = re.compile(r"^\d+x\d+$", re.IGNORECASE)
+
+
+def normalize_topic_name(topic: str | None) -> str:
+    """Normalize topic strings to avoid duplicate categories for the same activity."""
+    if not topic:
+        return "Other"
+    t = str(topic).strip()
+    # Normalize any variation of Meet meeting codes or titles to "Google Meet"
+    if re.search(r"\b(meet|google meet)\b", t, re.I) or re.search(r"^\s*meet\b", t, re.I):
+        return "Google Meet"
+    return t
 
 
 def clean_term(term: str) -> str:
@@ -62,6 +75,10 @@ def is_valid_term(term: str) -> bool:
 
 def clean_title_for_topic(title: str) -> str:
     """Clean a raw title to extract its primary subject phrase."""
+    if not title:
+        return "Other"
+    if re.search(r"\b(meet|google meet)\b", title, re.I) or re.search(r"^\s*meet\b", title, re.I):
+        return "Google Meet"
     # Remove common video suffixes
     text = title.split("|")[0].split(" - ")[0].split("—")[0].split("ft.")[0].split("feat.")[0].strip()
     text = re.sub(r"\[.*?\]|\(.*?\)", "", text).strip()
@@ -85,7 +102,11 @@ def classify_single_event(title: str, artist: str | None = None) -> str:
         if pattern.search(combined):
             return cat_name
 
-    # 2. Extract clean coherent title phrase (never join unrelated single words with '&')
+    # 2. Check for Google Meet titles
+    if re.search(r"\b(meet|google meet)\b", combined, re.I) or re.search(r"^\s*meet\b", combined, re.I):
+        return "Google Meet"
+
+    # 3. Extract clean coherent title phrase
     clean = clean_title_for_topic(title)
     if clean and len(clean) >= 3 and clean.lower() not in ("other", "video", "watched", "null"):
         return clean

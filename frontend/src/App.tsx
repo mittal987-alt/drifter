@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 
 import { AuthLoading } from "@/components/auth/AuthLoading";
 import { AuthScreen } from "@/components/auth/AuthScreen";
+import { LandingPage } from "@/components/auth/LandingPage";
 import { SpotifyChoiceModal } from "@/components/auth/SpotifyChoiceModal";
 import { useAuth } from "@/hooks/useAuth";
 import { authService } from "@/services/auth";
@@ -138,6 +139,9 @@ function App() {
   useEffect(() => {
     registerToastFn(addToast);
   }, [addToast]);
+
+  // Controls whether the marketing LandingPage is shown before AuthScreen
+  const [showLanding, setShowLanding] = useState(true);
 
   const [dashboard, setDashboard] =
     useState<DashboardData | null>(null);
@@ -914,6 +918,11 @@ function App() {
   }
 
   if (!authenticated) {
+    // Show the dedicated landing page first; "Get Started" navigates to the auth screen
+    if (showLanding) {
+      return <LandingPage onGetStarted={() => setShowLanding(false)} />;
+    }
+
     return (
       <>
         <AuthScreen

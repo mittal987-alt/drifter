@@ -14,6 +14,7 @@ from app.analytics.clustering import (
 from app.analytics.topics import (
     generate_topic_labels,
     classify_single_event,
+    normalize_topic_name,
 )
 
 from app.analytics.time_analysis import (
@@ -264,6 +265,8 @@ def run_analysis_pipeline(
             fallback = classify_single_event(event["title"], event.get("artist"))
             if fallback:
                 topic = fallback
+
+        topic = normalize_topic_name(topic)
 
         assignment_rows.append(
             {

@@ -264,6 +264,11 @@ export async function getInterestPredictions(source?: string): Promise<Predictio
 }
 
 export interface CorrelationPair {
+  source_a?: string;
+  source_b?: string;
+  topic_a?: string;
+  topic_b?: string;
+  // legacy
   video_topic: string;
   audio_tag: string;
   co_occurrence_count: number;
@@ -279,8 +284,12 @@ export interface CorrelationMode {
 
 export interface HourlyDistribution {
   hour: number;
-  youtube: number;
-  spotify: number;
+  [source: string]: number;
+}
+
+export interface PlatformMeta {
+  label: string;
+  color: string;
 }
 
 export interface CorrelationData {
@@ -288,13 +297,10 @@ export interface CorrelationData {
   synergy_score: number;
   resonance_tier?: string;
   correlations: CorrelationPair[];
-  platform_split: {
-    youtube: number;
-    spotify: number;
-    youtube_pct: number;
-    spotify_pct: number;
-  };
-  daypart_dominance: Record<string, { youtube: number; spotify: number }>;
+  platform_split: Record<string, number>;
+  platform_meta?: Record<string, PlatformMeta>;
+  active_sources?: string[];
+  daypart_dominance: Record<string, Record<string, number>>;
   hourly_distribution?: HourlyDistribution[];
   modes?: CorrelationMode[];
   insight: string;

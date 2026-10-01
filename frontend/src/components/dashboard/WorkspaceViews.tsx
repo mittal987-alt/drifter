@@ -65,8 +65,6 @@ export type WorkspaceView =
   | "correlation"
   | "dna";
 
-import { RefreshCw } from "lucide-react";
-
 interface WorkspaceProps {
   dashboard: DashboardData;
   history: HistoryEvent[];
@@ -176,64 +174,194 @@ export function OverviewView({
 }: WorkspaceProps) {
   const overview = dashboard.overview;
   const assignments = assignmentsOf(dashboard);
-  const latest = assignments.slice(-5).reverse();
+  const latest = assignments.slice(-6).reverse();
   const dominant = overview.dominant_topic || "No dominant topic yet";
   const eventCount = typeof overview.events === "number" ? overview.events : Array.isArray(overview.events) ? (overview.events as unknown[]).length : Number(overview.events) || assignments.length;
 
   return (
     <>
       <ViewIntro
-        eyebrow="Personal signal / overview"
+        eyebrow="Personal Signal / Neural Intelligence Engine"
         title="Your attention has a shape."
-        description="A living readout of what you explore, how it connects, and where it is moving next."
+        description="A real-time readout of what you explore, how curiosities connect across platforms, and where your focus is drifting next."
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {onRefresh && (
-              <button className="workspace-action" onClick={onRefresh} title="Re-cluster with clean topic labels">
+              <button
+                className="workspace-action hover:border-amber-500/50 hover:text-amber-400 transition"
+                onClick={onRefresh}
+                title="Re-cluster with clean topic labels"
+              >
                 <RefreshCw size={14} /> Re-analyze Topics
               </button>
             )}
-            <button className="workspace-action" onClick={() => onOpenView("map")}><MapIcon size={15} /> Open map</button>
+            {onOpenImport && (
+              <button
+                className="workspace-action hover:border-purple-500/50 hover:text-purple-400 transition"
+                onClick={onOpenImport}
+              >
+                <Upload size={14} /> Import History
+              </button>
+            )}
+            <button className="workspace-action bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20 transition" onClick={() => onOpenView("map")}>
+              <MapIcon size={15} /> Open 3D Map
+            </button>
           </div>
         }
       />
 
+      {/* QUICK FEATURE LAUNCHPAD */}
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <button
+          onClick={() => onOpenView("map")}
+          className="group relative flex flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-left backdrop-blur-md transition-all hover:-translate-y-1 hover:border-amber-400/40 hover:bg-white/[0.05] hover:shadow-xl hover:shadow-amber-500/10"
+        >
+          <div className="flex items-center justify-between w-full mb-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-400/10 text-amber-400 group-hover:scale-110 transition">
+              <MapIcon size={18} />
+            </div>
+            <ArrowUpRight size={16} className="text-white/30 group-hover:text-amber-400 transition" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-white group-hover:text-amber-400 transition">Interest Map</h3>
+            <p className="mt-1 text-xs text-white/50 leading-relaxed">2D semantic cluster vector space</p>
+          </div>
+        </button>
 
-      <div className="signal-grid">
-        <div className="signal-card signal-card-featured">
+        <button
+          onClick={() => onOpenView("prediction")}
+          className="group relative flex flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-left backdrop-blur-md transition-all hover:-translate-y-1 hover:border-purple-400/40 hover:bg-white/[0.05] hover:shadow-xl hover:shadow-purple-500/10"
+        >
+          <div className="flex items-center justify-between w-full mb-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-400/10 text-purple-400 group-hover:scale-110 transition">
+              <Brain size={18} />
+            </div>
+            <ArrowUpRight size={16} className="text-white/30 group-hover:text-purple-400 transition" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-white group-hover:text-purple-400 transition">AI Predictions</h3>
+            <p className="mt-1 text-xs text-white/50 leading-relaxed">Markov interest horizon forecasts</p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => onOpenView("dna")}
+          className="group relative flex flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-left backdrop-blur-md transition-all hover:-translate-y-1 hover:border-cyan-400/40 hover:bg-white/[0.05] hover:shadow-xl hover:shadow-cyan-500/10"
+        >
+          <div className="flex items-center justify-between w-full mb-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-400 group-hover:scale-110 transition">
+              <Dna size={18} />
+            </div>
+            <ArrowUpRight size={16} className="text-white/30 group-hover:text-cyan-400 transition" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-white group-hover:text-cyan-400 transition">Interest DNA</h3>
+            <p className="mt-1 text-xs text-white/50 leading-relaxed">Curiosity entropy & cognitive profile</p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => onOpenView("correlation")}
+          className="group relative flex flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-left backdrop-blur-md transition-all hover:-translate-y-1 hover:border-emerald-400/40 hover:bg-white/[0.05] hover:shadow-xl hover:shadow-emerald-500/10"
+        >
+          <div className="flex items-center justify-between w-full mb-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-400 group-hover:scale-110 transition">
+              <Zap size={18} />
+            </div>
+            <ArrowUpRight size={16} className="text-white/30 group-hover:text-emerald-400 transition" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-white group-hover:text-emerald-400 transition">Platform Synergy</h3>
+            <p className="mt-1 text-xs text-white/50 leading-relaxed">Audio/video media correlation</p>
+          </div>
+        </button>
+      </div>
+
+      {/* SIGNAL METRICS HUD */}
+      <div className="signal-grid mt-6">
+        <div className="signal-card signal-card-featured relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
+            <Flame size={72} className="text-amber-400" />
+          </div>
           <span className="signal-label">Current center of gravity</span>
-          <strong>{dominant}</strong>
-          <p>{eventCount.toLocaleString()} events across {overview.topics} discovered topics.</p>
-          <button onClick={() => onOpenView("map")} className="text-action">Explore the cluster <ArrowUpRight size={14} /></button>
+          <strong className="text-2xl font-bold tracking-tight text-white">{dominant}</strong>
+          <p className="mt-2 text-xs text-white/60">
+            {eventCount.toLocaleString()} total events indexed across {overview.topics} distinct topic clusters.
+          </p>
+          <button onClick={() => onOpenView("map")} className="text-action mt-3 inline-flex items-center gap-1 text-xs font-semibold text-amber-400 hover:text-amber-300">
+            Explore cluster in vector space <ArrowUpRight size={14} />
+          </button>
         </div>
-        <div className="signal-card">
-          <span className="signal-label">Latest drift</span>
-          <strong>{overview.current_drift.toFixed(3)}</strong>
-          <p>Change in your interest distribution over the latest period.</p>
-          <button onClick={() => onOpenView("evolution")} className="text-action">View trajectory <ArrowUpRight size={14} /></button>
+
+        <div className="signal-card relative overflow-hidden group">
+          <span className="signal-label">Latest drift velocity</span>
+          <strong className="text-2xl font-bold tracking-tight text-white">{overview.current_drift.toFixed(3)}</strong>
+          <p className="mt-2 text-xs text-white/60">
+            Rate of change in your interest distribution over recent timeline windows.
+          </p>
+          <button onClick={() => onOpenView("evolution")} className="text-action mt-3 inline-flex items-center gap-1 text-xs font-semibold text-purple-400 hover:text-purple-300">
+            View trajectory chart <ArrowUpRight size={14} />
+          </button>
         </div>
-        <div className="signal-card">
-          <span className="signal-label">New directions</span>
-          <strong>{dashboard.evolution.emerging.length}</strong>
-          <p>Emerging interests detected in your recent history.</p>
-          <button onClick={() => onOpenView("evolution")} className="text-action">Inspect emerging <ArrowUpRight size={14} /></button>
+
+        <div className="signal-card relative overflow-hidden group">
+          <span className="signal-label">Emerging focus paths</span>
+          <strong className="text-2xl font-bold tracking-tight text-white">{dashboard.evolution.emerging.length}</strong>
+          <p className="mt-2 text-xs text-white/60">
+            Newly detected curiosity directions in your media streams.
+          </p>
+          <button onClick={() => onOpenView("evolution")} className="text-action mt-3 inline-flex items-center gap-1 text-xs font-semibold text-cyan-400 hover:text-cyan-300">
+            Inspect emerging topics <ArrowUpRight size={14} />
+          </button>
         </div>
       </div>
 
-      <div className="workspace-two-column">
+      {/* TOPIC LANDSCAPE & ACTIVITY FEED */}
+      <div className="workspace-two-column mt-6">
         <Panel>
-          <div className="panel-heading"><div><span className="workspace-eyebrow">Most explored</span><h2>Topic landscape</h2></div><button className="icon-action" title="Open interest map" onClick={() => onOpenView("map")}><MapIcon size={16} /></button></div>
+          <div className="panel-heading">
+            <div>
+              <span className="workspace-eyebrow">Most Explored</span>
+              <h2>Topic Landscape</h2>
+            </div>
+            <button className="icon-action" title="Open interest map" onClick={() => onOpenView("map")}>
+              <MapIcon size={16} />
+            </button>
+          </div>
           <TopicList topics={dashboard.top_topics} onSelect={() => onOpenView("map")} />
         </Panel>
+
         <Panel>
-          <div className="panel-heading"><div><span className="workspace-eyebrow">Recent traces</span><h2>Latest activity</h2></div><button className="icon-action" title="Open history" onClick={() => onOpenView("history")}><History size={16} /></button></div>
+          <div className="panel-heading">
+            <div>
+              <span className="workspace-eyebrow">Recent Traces</span>
+              <h2>Latest Activity</h2>
+            </div>
+            <button className="icon-action" title="Open history" onClick={() => onOpenView("history")}>
+              <History size={16} />
+            </button>
+          </div>
           <div className="trace-list">
-            {latest.map((event) => <div className="trace-row" key={event.event_id}><span className="trace-dot" style={{ background: topicColor(event.topic) }} /><div><strong>{event.title}</strong><span>{event.topic} · {event.source}</span></div><time>{new Date(event.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</time></div>)}
-            {!latest.length && <Empty message="Import history to reveal your traces." />}
+            {latest.map((event) => (
+              <div className="trace-row" key={event.event_id}>
+                <span className="trace-dot" style={{ background: topicColor(event.topic) }} />
+                <div className="min-w-0 flex-1">
+                  <strong className="truncate block text-xs font-medium text-white">{event.title}</strong>
+                  <span className="text-[11px] text-white/40">
+                    {event.topic} · <span className="uppercase text-amber-400/80 font-semibold">{event.source}</span>
+                  </span>
+                </div>
+                <time className="text-[11px] text-white/35">
+                  {new Date(event.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                </time>
+              </div>
+            ))}
+            {!latest.length && <Empty message="Import history or connect platforms to reveal your digital traces." />}
           </div>
         </Panel>
       </div>
 
+      {/* PLATFORM INTELLIGENCE & DISTRIBUTION */}
       <div className="mt-6 space-y-6">
         <PlatformIntelligenceHub
           assignments={assignments}

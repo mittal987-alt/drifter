@@ -377,8 +377,9 @@
 
     if (!isInternal && !isAuth && document.title) {
       let logged = false;
-      const dwellTimer = setTimeout(() => {
-        if (logged || document.hidden) return;
+
+      function logBrowserEvent() {
+        if (logged) return;
 
         const rawTitle = document.title.trim();
         if (rawTitle.length < 4 || rawTitle.toLowerCase() === "loading...") return;
@@ -401,9 +402,16 @@
           type: "YOUTUBE_WATCH_EVENT",
           payload: browserEvent,
         });
-      }, 15000);
+      }
 
-      window.addEventListener("beforeunload", () => clearTimeout(dwellTimer));
+      // Log after 5s of dwell time (down from 15s so quick visits still count)
+      const dwellTimer = setTimeout(logBrowserEvent, 5000);
+
+      // Also log immediately on page leave in case they left before 5s
+      window.addEventListener("beforeunload", () => {
+        clearTimeout(dwellTimer);
+        logBrowserEvent();
+      });
     }
   }
 })();

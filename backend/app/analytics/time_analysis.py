@@ -78,6 +78,8 @@ def group_by_month(assignments: list[dict[str, Any]]) -> dict[str, list[dict[str
 # MONTHLY TOPIC COUNTS
 # ============================================================
 
+from app.analytics.topics import normalize_topic_name
+
 def calculate_monthly_topic_counts(assignments: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
     """
     Calculate how many events belong to each topic for every month.
@@ -88,7 +90,8 @@ def calculate_monthly_topic_counts(assignments: list[dict[str, Any]]) -> dict[st
     for month, events in monthly.items():
         counts = defaultdict(int)
         for event in events:
-            topic = event.get("topic", "Other")
+            raw_topic = event.get("topic", "Other")
+            topic = normalize_topic_name(raw_topic)
             counts[topic] += 1
         result[month] = dict(counts)
 

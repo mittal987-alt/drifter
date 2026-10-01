@@ -38,6 +38,12 @@ function getTopicColor(topic: string, index = 0): string {
   return TOPIC_COLORS[Math.abs(hash + index) % TOPIC_COLORS.length];
 }
 
+function normalizeTopic(topic: string): string {
+  if (!topic) return "Other";
+  if (/^meet\b|\bgoogle meet\b/i.test(topic)) return "Google Meet";
+  return topic;
+}
+
 export default function InterestEvolution({
   monthlyProportions,
 }: InterestEvolutionProps) {
@@ -50,11 +56,12 @@ export default function InterestEvolution({
       return { topTopics: [], chartData: [], topicColors: {} as Record<string, string> };
     }
 
-    // Accumulate total scores per topic
+    // Accumulate total scores per topic with normalization
     const topicTotals: Record<string, number> = {};
     months.forEach((month) => {
       const monthData = safeProportions[month] || {};
-      Object.entries(monthData).forEach(([topic, score]) => {
+      Object.entries(monthData).forEach(([rawTopic, score]) => {
+        const topic = normalizeTopic(rawTopic);
         topicTotals[topic] = (topicTotals[topic] || 0) + score;
       });
     });
@@ -82,8 +89,15 @@ export default function InterestEvolution({
       const monthData = safeProportions[month] || {};
       const row: Record<string, string | number> = { month };
 
+      // Aggregate normalized scores per topic for this month
+      const monthTopicScores: Record<string, number> = {};
+      Object.entries(monthData).forEach(([rawTopic, score]) => {
+        const topic = normalizeTopic(rawTopic);
+        monthTopicScores[topic] = (monthTopicScores[topic] || 0) + score;
+      });
+
       let otherSum = 0;
-      Object.entries(monthData).forEach(([topic, score]) => {
+      Object.entries(monthTopicScores).forEach(([topic, score]) => {
         if (primaryTopics.includes(topic)) {
           row[topic] = Number((score * 100).toFixed(1));
         } else {

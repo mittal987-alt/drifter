@@ -92,13 +92,29 @@ export function AuthScreen({
         </AnimatedGradientText>
 
         {/* Hero */}
-        <div className="text-center max-w-2xl">
-          <h1 className="text-4xl font-semibold tracking-tight sm:text-6xl text-white">
-            Your interests, <span className="text-white/40">evolving.</span>
+        <div className="text-center max-w-3xl">
+          <h1 className="text-4xl font-extrabold tracking-tight sm:text-6xl text-white">
+            Your media attention, <span className="bg-gradient-to-r from-amber-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">decoded.</span>
           </h1>
-          <p className="mx-auto mt-4 text-sm leading-relaxed text-white/50">
-            Drifter maps your personal media evolution and gives you a personal token to import your digital traces from any method you use.
+          <p className="mx-auto mt-4 text-sm sm:text-base leading-relaxed text-white/60 max-w-2xl">
+            Drifter transforms your raw watch history, music streams, and browsing traces into an interactive AI intelligence map of your mind.
           </p>
+
+          {/* FEATURE HIGHLIGHT PILLS */}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-amber-300 font-medium">
+              ✨ 2D Vector Embedding Map
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/20 bg-purple-500/10 px-3 py-1 text-purple-300 font-medium">
+              🔮 Markov Interest Forecasts
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-cyan-300 font-medium">
+              🧬 Generative Curiosity DNA
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-emerald-300 font-medium">
+              ⚡ Multi-Platform Sync
+            </span>
+          </div>
         </div>
 
         {/* MANUAL EMAIL/PASSWORD CARD */}
