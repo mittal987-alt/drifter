@@ -158,7 +158,9 @@ app.add_middleware(
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ],
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    # Also allow Chrome/Firefox extension origins so the background
+    # service worker can POST events without CORS preflight failures.
+    allow_origin_regex=r"^(https?://(localhost|127\.0\.0\.1)(:\d+)?|chrome-extension://[a-z]+|moz-extension://[\w-]+)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

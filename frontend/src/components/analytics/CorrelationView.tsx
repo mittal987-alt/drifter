@@ -12,23 +12,23 @@ import {
   Search,
   Globe,
   GitBranch,
-  Tv,
-  Gamepad2,
-  Twitter,
-  MessageSquare,
+  Monitor,
+  Joystick,
+  AtSign,
+  Hash,
 } from "lucide-react";
 import { getPlatformCorrelation, type CorrelationData } from "@/services/analytics";
 
 // ─── Source colour + icon registry ─────────────────────────────────────────
 const SOURCE_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; icon: React.ReactNode }> = {
-  youtube:  { label: "YouTube",  color: "#ef4444", bg: "bg-red-500/15",     border: "border-red-500/30",     icon: <Video    size={14} /> },
-  spotify:  { label: "Spotify",  color: "#22c55e", bg: "bg-emerald-500/15", border: "border-emerald-500/30", icon: <Music    size={14} /> },
-  browser:  { label: "Browser",  color: "#60a5fa", bg: "bg-blue-500/15",    border: "border-blue-500/30",    icon: <Globe    size={14} /> },
+  youtube:  { label: "YouTube",  color: "#ef4444", bg: "bg-red-500/15",     border: "border-red-500/30",     icon: <Video     size={14} /> },
+  spotify:  { label: "Spotify",  color: "#22c55e", bg: "bg-emerald-500/15", border: "border-emerald-500/30", icon: <Music     size={14} /> },
+  browser:  { label: "Browser",  color: "#60a5fa", bg: "bg-blue-500/15",    border: "border-blue-500/30",    icon: <Globe     size={14} /> },
   github:   { label: "GitHub",   color: "#a78bfa", bg: "bg-violet-500/15",  border: "border-violet-500/30",  icon: <GitBranch size={14} /> },
-  reddit:   { label: "Reddit",   color: "#fb923c", bg: "bg-orange-500/15",  border: "border-orange-500/30",  icon: <MessageSquare size={14} /> },
-  netflix:  { label: "Netflix",  color: "#dc2626", bg: "bg-red-700/15",     border: "border-red-700/30",     icon: <Tv       size={14} /> },
-  steam:    { label: "Steam",    color: "#38bdf8", bg: "bg-sky-500/15",     border: "border-sky-500/30",     icon: <Gamepad2 size={14} /> },
-  twitter:  { label: "Twitter",  color: "#93c5fd", bg: "bg-blue-400/15",    border: "border-blue-400/30",    icon: <Twitter  size={14} /> },
+  reddit:   { label: "Reddit",   color: "#fb923c", bg: "bg-orange-500/15",  border: "border-orange-500/30",  icon: <Hash      size={14} /> },
+  netflix:  { label: "Netflix",  color: "#dc2626", bg: "bg-red-700/15",     border: "border-red-700/30",     icon: <Monitor   size={14} /> },
+  steam:    { label: "Steam",    color: "#38bdf8", bg: "bg-sky-500/15",     border: "border-sky-500/30",     icon: <Joystick  size={14} /> },
+  twitter:  { label: "Twitter",  color: "#93c5fd", bg: "bg-blue-400/15",    border: "border-blue-400/30",    icon: <AtSign    size={14} /> },
 };
 
 function srcCfg(src: string) {
