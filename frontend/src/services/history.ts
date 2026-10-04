@@ -8,8 +8,6 @@ export type HistorySource =
   | "youtube"
   | "spotify"
   | "github"
-  | "reddit"
-  | "netflix"
   | "steam"
   | "twitter"
   | "browser";

@@ -198,8 +198,6 @@ export default function ImportHistoryModal({
                 { id: "youtube", label: "YouTube", sub: "Watch history" },
                 { id: "spotify", label: "Spotify", sub: "Listening history" },
                 { id: "github", label: "GitHub", sub: "Star / repo events" },
-                { id: "reddit", label: "Reddit", sub: "Saved & upvoted" },
-                { id: "netflix", label: "Netflix", sub: "Viewing history" },
                 { id: "steam", label: "Steam", sub: "Game library" },
                 { id: "twitter", label: "X / Twitter", sub: "Archive export" },
                 { id: "browser", label: "Web Browsing", sub: "History export" },
@@ -298,8 +296,6 @@ export default function ImportHistoryModal({
                    source === "spotify" ? "CSV (Extended streaming history)" :
                    source === "twitter" ? "HTML or JSON (Twitter archive)" :
                    source === "github" ? "JSON export" :
-                   source === "reddit" ? "CSV export" :
-                   source === "netflix" ? "CSV (NetflixViewingHistory.csv)" :
                    source === "steam" ? "JSON (Steam API export)" :
                    "JSON or CSV"}
                 </p>
@@ -330,13 +326,6 @@ export default function ImportHistoryModal({
               )}
               {source === "twitter" && (
                 <>📦 Request your archive at <a href="https://twitter.com/settings/download_your_data" target="_blank" rel="noopener noreferrer" className="underline text-white/60 hover:text-white">Settings → Your Account → Download archive</a>. Upload the <code className="text-white/70">tweet.js</code> or HTML files.</>  
-              )}
-              {source === "netflix" && (
-                <>📦 Download at <a href="https://www.netflix.com/account/getmyinfo" target="_blank" rel="noopener noreferrer" className="underline text-white/60 hover:text-white">netflix.com/account</a> → &ldquo;Get my info&rdquo; → ViewingActivity. Upload <code className="text-white/70">NetflixViewingHistory.csv</code>.</>  
-              )}
-
-              {source === "reddit" && (
-                <>📦 Or use the <strong className="text-white/60">Drifter Extension</strong> which auto-tracks Reddit threads you browse — zero CSV setup needed.</>  
               )}
               {source === "github" && (
                 <>📦 Or use <strong className="text-white/60">1-Click GitHub OAuth</strong> in the Platform Hub to import starred repos automatically — no file needed.</>  

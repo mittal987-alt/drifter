@@ -28,7 +28,6 @@ interface HealthData {
     youtube: boolean;
     spotify: boolean;
     github: boolean;
-    reddit: boolean;
   };
   cache_entries: number;
 }
@@ -40,7 +39,6 @@ interface SystemHealthModalProps {
     youtube: boolean;
     spotify: boolean;
     github: boolean;
-    reddit: boolean;
   };
 }
 
@@ -189,7 +187,6 @@ export function SystemHealthModal({
                 { name: "YouTube", key: "youtube" as const },
                 { name: "Spotify", key: "spotify" as const },
                 { name: "GitHub", key: "github" as const },
-                { name: "Reddit", key: "reddit" as const },
               ].map((p) => {
                 const isConnected = connectedProviders[p.key];
                 return (

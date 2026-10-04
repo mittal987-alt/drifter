@@ -65,7 +65,7 @@ export function OnboardingWizard({
       label: "Connect",
       title: "Connect your platforms",
       description:
-        "Link YouTube and Spotify for automatic syncing. GitHub and Reddit can also be connected for a richer interest map.",
+        "Link YouTube and Spotify for automatic syncing. GitHub can also be connected for a richer interest map.",
       actions: (
         <div className="mt-8 space-y-3">
           <button
@@ -103,7 +103,7 @@ export function OnboardingWizard({
       label: "Import",
       title: "Import your history",
       description:
-        "Upload a YouTube watch-history JSON from Google Takeout, or import Spotify, Reddit, GitHub data. You can also use the Drifter Chrome Extension.",
+        "Upload a YouTube watch-history JSON from Google Takeout, or import Spotify, GitHub data. You can also use the Drifter Chrome Extension.",
       actions: (
         <div className="mt-8 space-y-3">
           <button

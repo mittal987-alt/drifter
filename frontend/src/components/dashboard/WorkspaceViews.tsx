@@ -992,7 +992,7 @@ export function HistoryView({ dashboard, history, historyLoading, onRefresh }: W
                 >
                   All Platforms ({sourceCounts.all || 0})
                 </button>
-                {(["youtube", "spotify", "github", "reddit", "netflix", "steam", "twitter", "browser"] as const).map((src) => (
+                {(["youtube", "spotify", "github", "steam", "twitter", "browser"] as const).map((src) => (
                   <button
                     key={src}
                     type="button"

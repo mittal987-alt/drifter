@@ -159,7 +159,7 @@ function App() {
     useState(false);
 
   const [importSource, setImportSource] =
-    useState<"youtube" | "spotify" | "github" | "reddit" | "netflix" | "steam" | "twitter" | "browser">("youtube");
+    useState<"youtube" | "spotify" | "github" | "steam" | "twitter" | "browser">("youtube");
 
   const [importFile, setImportFile] =
     useState<File | null>(null);
@@ -503,8 +503,6 @@ function App() {
                 {importSource === "spotify" && "Upload your Spotify listening history JSON or CSV from Privacy Settings."}
                 {importSource === "youtube" && "Upload your YouTube watch history JSON or Google Takeout ZIP."}
                 {importSource === "github" && "Upload your GitHub starred repositories or events JSON."}
-                {importSource === "reddit" && "Upload your Reddit comments or upvoted posts CSV."}
-                {importSource === "netflix" && "Upload your NetflixViewingActivity.csv from Account settings."}
                 {importSource === "steam" && "Upload your Steam games/playtime JSON export."}
                 {importSource === "twitter" && "Upload your Twitter/X archive tweets.js or JSON export."}
                 {importSource === "browser" && "Upload your Chrome/Firefox browsing history JSON or CSV."}
@@ -532,8 +530,6 @@ function App() {
                   { id: "youtube", label: "YouTube", sub: "Watch history" },
                   { id: "spotify", label: "Spotify", sub: "Audio & Music" },
                   { id: "github", label: "GitHub", sub: "Code & Repos" },
-                  { id: "reddit", label: "Reddit", sub: "Discussions" },
-                  { id: "netflix", label: "Netflix", sub: "Viewing CSV" },
                   { id: "steam", label: "Steam", sub: "Games & Playtime" },
                   { id: "twitter", label: "X / Twitter", sub: "Tweets & Threads" },
                   { id: "browser", label: "Browser", sub: "Web History" },
