@@ -14,13 +14,13 @@ import {
 } from "lucide-react";
 import { chatWithHistory, type ChatResponse } from "@/services/analytics";
 import { BorderBeam } from "@/components/ui/border-beam";
-import { motion } from "motion/react";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   topics?: string[];
+  sources?: string[];
   suggestedQueries?: string[];
   timestamp: string;
 }
@@ -29,6 +29,96 @@ interface HistoryChatModalProps {
   isOpen: boolean;
   onClose: () => void;
   source?: string;
+}
+
+// ── Platform metadata ──────────────────────────────────────────────────────────
+const PLATFORM_META: Record<
+  string,
+  { label: string; emoji: string; color: string; bg: string; border: string }
+> = {
+  youtube: {
+    label: "YouTube",
+    emoji: "▶",
+    color: "text-red-400",
+    bg: "bg-red-500/10",
+    border: "border-red-500/25",
+  },
+  spotify: {
+    label: "Spotify",
+    emoji: "♫",
+    color: "text-emerald-400",
+    bg: "bg-emerald-500/10",
+    border: "border-emerald-500/25",
+  },
+  github: {
+    label: "GitHub",
+    emoji: "⬡",
+    color: "text-purple-400",
+    bg: "bg-purple-500/10",
+    border: "border-purple-500/25",
+  },
+  reddit: {
+    label: "Reddit",
+    emoji: "◉",
+    color: "text-orange-400",
+    bg: "bg-orange-500/10",
+    border: "border-orange-500/25",
+  },
+  netflix: {
+    label: "Netflix",
+    emoji: "◈",
+    color: "text-rose-400",
+    bg: "bg-rose-500/10",
+    border: "border-rose-500/25",
+  },
+  steam: {
+    label: "Steam",
+    emoji: "◎",
+    color: "text-blue-400",
+    bg: "bg-blue-500/10",
+    border: "border-blue-500/25",
+  },
+  twitter: {
+    label: "X / Twitter",
+    emoji: "✕",
+    color: "text-sky-400",
+    bg: "bg-sky-500/10",
+    border: "border-sky-500/25",
+  },
+  web: {
+    label: "Web",
+    emoji: "◌",
+    color: "text-cyan-400",
+    bg: "bg-cyan-500/10",
+    border: "border-cyan-500/25",
+  },
+  chrome: {
+    label: "Chrome",
+    emoji: "◑",
+    color: "text-yellow-400",
+    bg: "bg-yellow-500/10",
+    border: "border-yellow-500/25",
+  },
+  extension: {
+    label: "Extension",
+    emoji: "◐",
+    color: "text-violet-400",
+    bg: "bg-violet-500/10",
+    border: "border-violet-500/25",
+  },
+};
+
+function getPlatformMeta(src: string) {
+  const key = src.toLowerCase().trim();
+  return (
+    PLATFORM_META[key] ?? {
+      label: src.charAt(0).toUpperCase() + src.slice(1),
+      emoji: "◆",
+      color: "text-white/60",
+      bg: "bg-white/[0.04]",
+      border: "border-white/[0.08]",
+    }
+  );
 }
 
 const QUICK_PROMPTS = [
@@ -49,7 +139,7 @@ export default function HistoryChatModal({
       id: "welcome",
       role: "assistant",
       content:
-        "Hello! I'm **Drifter AI** — your personal interest archaeologist. Ask me anything about your obsessions, late-night rabbit holes, or how your attention has shifted over time.",
+        "Hello! I'm **Drifter AI** — your personal interest archaeologist. Ask me anything about your obsessions, late-night rabbit holes, or how your attention has shifted over time. My answers draw from all your connected platforms.",
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       suggestedQueries: [
         "What was my biggest obsession?",
@@ -117,6 +207,7 @@ export default function HistoryChatModal({
         role: "assistant",
         content: res.reply,
         topics: res.referenced_topics,
+        sources: res.referenced_sources,
         suggestedQueries: res.suggested_queries,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
@@ -233,6 +324,32 @@ export default function HistoryChatModal({
                 }`}
               >
                 <div className="space-y-0.5">{renderContent(m.content)}</div>
+
+                {/* SOURCE ATTRIBUTION BADGES */}
+                {m.role === "assistant" && m.sources && m.sources.length > 0 && (
+                  <div className="mt-3 pt-2.5 border-t border-white/[0.07]">
+                    <p className="text-[9px] text-white/25 font-mono uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                      <span className="opacity-60">◈</span> Sources
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {m.sources.map((src) => {
+                        const meta = getPlatformMeta(src);
+                        return (
+                          <span
+                            key={src}
+                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-medium tracking-wide transition-all ${meta.bg} ${meta.border} ${meta.color}`}
+                            title={`Data from ${meta.label}`}
+                          >
+                            <span className="text-[11px] leading-none opacity-90 font-mono">
+                              {meta.emoji}
+                            </span>
+                            {meta.label}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {m.topics && m.topics.length > 0 && (
                   <div className="mt-2.5 pt-2 border-t border-white/[0.07] flex flex-wrap items-center gap-1.5">

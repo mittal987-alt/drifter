@@ -183,6 +183,7 @@ export interface ChatResponse {
   reply: string;
   suggested_queries: string[];
   referenced_topics: string[];
+  referenced_sources?: string[];
 }
 
 export async function chatWithHistory(

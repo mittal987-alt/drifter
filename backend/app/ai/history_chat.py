@@ -5,6 +5,42 @@ import re
 from typing import Any
 
 
+KNOWN_SOURCES = {"youtube", "spotify", "github", "reddit", "netflix", "steam", "twitter", "web", "chrome", "extension"}
+
+
+def _extract_sources(events: list[dict[str, Any]]) -> list[str]:
+    """Return a sorted, deduplicated list of platform source names found in the events."""
+    seen: list[str] = []
+    seen_set: set[str] = set()
+    for e in events:
+        raw = (e.get("source") or "").lower().strip()
+        # Normalise common variants
+        if "youtube" in raw or "google" in raw:
+            norm = "youtube"
+        elif "spotify" in raw:
+            norm = "spotify"
+        elif "github" in raw:
+            norm = "github"
+        elif "reddit" in raw:
+            norm = "reddit"
+        elif "netflix" in raw:
+            norm = "netflix"
+        elif "steam" in raw:
+            norm = "steam"
+        elif "twitter" in raw or "x.com" in raw:
+            norm = "twitter"
+        elif raw in KNOWN_SOURCES:
+            norm = raw
+        elif raw:
+            norm = raw
+        else:
+            continue
+        if norm not in seen_set:
+            seen_set.add(norm)
+            seen.append(norm)
+    return seen
+
+
 def _parse_timestamp(ts: Any) -> datetime | None:
     if isinstance(ts, datetime):
         return ts
@@ -84,13 +120,17 @@ def answer_history_chat(
     gemini_key = os.getenv("GEMINI_API_KEY")
     ollama_enabled = os.getenv("OLLAMA_ENABLED", "").lower() in ("1", "true", "yes")
 
+    all_sources = _extract_sources(assignments)
+
     if (openai_key or gemini_key or ollama_enabled) and total_events > 0:
         try:
-            return _call_external_llm(question, chat_history, events, analysis, openai_key, gemini_key, ollama_enabled)
+            result = _call_external_llm(question, chat_history, events, analysis, openai_key, gemini_key, ollama_enabled)
+            result.setdefault("referenced_sources", all_sources)
+            return result
         except Exception:
             pass
 
-    return _synthesize_local_response(
+    result = _synthesize_local_response(
         q_lower=q_lower,
         question=question,
         events=assignments,
@@ -104,6 +144,8 @@ def answer_history_chat(
         rabbit_holes=rabbit_holes,
         time_of_day=time_of_day,
     )
+    result.setdefault("referenced_sources", all_sources)
+    return result
 
 
 def _call_external_llm(
@@ -157,6 +199,7 @@ def _call_external_llm(
                             "When is my attention most focused?",
                         ],
                         "referenced_topics": [t.get("topic") for t in top_topics[:3]],
+                        "referenced_sources": _extract_sources(events),
                     }
 
     if gemini_key:
@@ -179,6 +222,7 @@ def _call_external_llm(
                         "When is my attention most focused?",
                     ],
                     "referenced_topics": [t.get("topic") for t in top_topics[:3]],
+                    "referenced_sources": _extract_sources(events),
                 }
 
     if openai_key:
@@ -205,6 +249,7 @@ def _call_external_llm(
                         "What am I likely to explore next?",
                     ],
                     "referenced_topics": [t.get("topic") for t in top_topics[:3]],
+                    "referenced_sources": _extract_sources(events),
                 }
 
     raise RuntimeError("External LLM not available")
