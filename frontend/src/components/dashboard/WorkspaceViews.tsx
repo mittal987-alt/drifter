@@ -54,6 +54,7 @@ import CorrelationView from "@/components/analytics/CorrelationView";
 import InterestDnaCard from "@/components/reports/InterestDnaCard";
 import PlatformIntelligenceHub from "@/components/analytics/PlatformIntelligenceHub";
 import CuriosityNexusView from "@/components/analytics/CuriosityNexusView";
+import FocusPulseHeatmap from "@/components/analytics/FocusPulseHeatmap";
 import NumberTicker from "@/components/ui/NumberTicker";
 import type { DashboardData } from "@/services/analytics";
 import { deleteHistoryEvent, clearHistory, type HistoryEvent } from "@/services/history";
@@ -579,7 +580,13 @@ export function BehaviorView({ dashboard, onOpenView }: WorkspaceProps) {
           </p>
         </div>
       </div>
-      <div className="workspace-two-column">
+
+      {/* WEEKLY ACTIVITY HEATMAP & FOCUS PULSE */}
+      <div className="mt-6">
+        <FocusPulseHeatmap onSelectDate={() => onOpenView("history")} />
+      </div>
+
+      <div className="workspace-two-column mt-6">
         <Panel>
           <div className="panel-heading">
             <div>

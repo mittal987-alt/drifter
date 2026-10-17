@@ -81,4 +81,12 @@ assert "bridge_title" in nexus_res and "serendipity_score" in nexus_res, "Nexus 
 assert len(nexus_res["recommendations"]["watch"]) > 0, "Nexus recommendations missing"
 print("✓ Feature 6 (Curiosity Nexus): Passed. Bridge:", nexus_res["bridge_title"], f"({nexus_res['topic_a']} × {nexus_res['topic_b']})", "Serendipity:", f"{nexus_res['serendipity_score']}%")
 
-print("\nAll 6 feature backends verified successfully!")
+# 7. Test Weekly Focus Pulse & Heatmap
+from app.analytics.pulse import generate_focus_pulse
+pulse_res = generate_focus_pulse(assignments=events, days_back=112)
+assert pulse_res["status"] == "READY", "Pulse status not READY"
+assert "heatmap" in pulse_res and len(pulse_res["heatmap"]) > 0, "Pulse heatmap cells missing"
+assert "matrix" in pulse_res and len(pulse_res["matrix"]) == 7, "Pulse matrix missing 7 days"
+print("✓ Feature 7 (Focus Pulse Heatmap): Passed. Active days:", pulse_res["active_days_count"], "Streak:", pulse_res["current_streak"], "Peak day:", pulse_res["peak_focus_day"])
+
+print("\nAll 7 feature backends verified successfully!")

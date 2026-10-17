@@ -27,6 +27,7 @@ from app.prediction.next_interest import predict_next_interests
 from app.analytics.correlation import analyze_cross_platform_correlation
 from app.reports.interest_dna import generate_interest_dna
 from app.analytics.nexus import generate_curiosity_nexus
+from app.analytics.pulse import generate_focus_pulse
 
 
 router = APIRouter()
@@ -747,3 +748,21 @@ def get_curiosity_nexus_endpoint(
         topic_a=topic_a,
         topic_b=topic_b,
     )
+
+
+# ============================================================
+# FEATURE 7: WEEKLY FOCUS PULSE & ACTIVITY HEATMAP
+# ============================================================
+
+@router.get("/pulse")
+def get_focus_pulse_endpoint(
+    days: int = 112,
+    source: str | None = None,
+    user_id: int = Depends(get_current_user_id),
+):
+    analysis, assignments = _load_user_analysis_and_events(user_id=user_id, source=source)
+    return generate_focus_pulse(
+        assignments=assignments,
+        days_back=days,
+    )
+

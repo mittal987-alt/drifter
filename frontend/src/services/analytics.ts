@@ -418,3 +418,45 @@ export async function getCuriosityNexus(
   return response.data;
 }
 
+export interface HeatmapCell {
+  date: string;
+  day_of_week: number;
+  count: number;
+  level: number;
+  dominant_topic?: string | null;
+  sources: Record<string, number>;
+  samples: string[];
+  is_future: boolean;
+}
+
+export interface DayHourMatrixRow {
+  day: string;
+  morning: number;
+  afternoon: number;
+  evening: number;
+  night: number;
+  total: number;
+}
+
+export interface FocusPulseData {
+  status: string;
+  total_events: number;
+  active_days_count: number;
+  current_streak: number;
+  longest_streak: number;
+  peak_focus_day: string;
+  peak_focus_block: string;
+  weekend_percentage: number;
+  nocturnal_percentage: number;
+  heatmap: HeatmapCell[];
+  matrix: DayHourMatrixRow[];
+  generated_at: string;
+}
+
+export async function getFocusPulse(days = 112, source?: string): Promise<FocusPulseData> {
+  const response = await apiClient.get<FocusPulseData>("/api/analytics/pulse", {
+    params: { days, source },
+  });
+  return response.data;
+}
+
