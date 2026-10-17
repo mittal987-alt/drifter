@@ -348,3 +348,73 @@ export async function getInterestDna(source?: string): Promise<InterestDnaData> 
   return response.data;
 }
 
+export interface NexusWatchRecommendation {
+  title: string;
+  query: string;
+  duration: string;
+}
+
+export interface NexusReadRecommendation {
+  title: string;
+  author: string;
+  type: string;
+}
+
+export interface NexusBuildRecommendation {
+  title: string;
+  description: string;
+  difficulty: string;
+}
+
+export interface NexusRecommendations {
+  watch: NexusWatchRecommendation[];
+  read: NexusReadRecommendation[];
+  build: NexusBuildRecommendation;
+  sonic_vibe: string;
+}
+
+export interface NexusPreset {
+  topic_a: string;
+  topic_b: string;
+  title: string;
+  serendipity_score: number;
+  friction: string;
+}
+
+export interface NexusTopicItem {
+  topic: string;
+  count: number;
+}
+
+export interface NexusData {
+  status: string;
+  topic_a: string;
+  topic_b: string;
+  serendipity_score: number;
+  friction: string;
+  bridge_title: string;
+  tagline: string;
+  narrative: string;
+  recommendations: NexusRecommendations;
+  samples: {
+    topic_a: string[];
+    topic_b: string[];
+  };
+  available_topics: NexusTopicItem[];
+  suggested_presets: NexusPreset[];
+  generated_at: string;
+}
+
+export async function getCuriosityNexus(
+  topicA?: string,
+  topicB?: string,
+  source?: string
+): Promise<NexusData> {
+  const response = await apiClient.post<NexusData>("/api/analytics/nexus", {
+    topic_a: topicA,
+    topic_b: topicB,
+    source,
+  });
+  return response.data;
+}
+

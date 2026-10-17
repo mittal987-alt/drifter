@@ -83,6 +83,7 @@ import {
   PredictionWorkspaceView,
   CorrelationWorkspaceView,
   DnaWorkspaceView,
+  NexusWorkspaceView,
   type WorkspaceView,
 } from "./components/dashboard/WorkspaceViews";
 import HistoryChatModal from "./components/chat/HistoryChatModal";
@@ -179,6 +180,7 @@ function App() {
       if (path.includes("predict")) return "prediction";
       if (path.includes("correlat")) return "correlation";
       if (path.includes("dna")) return "dna";
+      if (path.includes("nexus")) return "nexus";
       if (path.includes("map")) return "map";
       if (path.includes("evolution")) return "evolution";
       if (path.includes("behavior")) return "behavior";
@@ -226,6 +228,7 @@ function App() {
       if (path.includes("predict")) setActiveView("prediction");
       else if (path.includes("correlat")) setActiveView("correlation");
       else if (path.includes("dna")) setActiveView("dna");
+      else if (path.includes("nexus")) setActiveView("nexus");
       else if (path.includes("map")) setActiveView("map");
       else if (path.includes("evolution")) setActiveView("evolution");
       else if (path.includes("behavior")) setActiveView("behavior");
@@ -1332,6 +1335,20 @@ function App() {
               }
             />
 
+            <SidebarItem
+              icon={<Sparkles size={17} />}
+              label="Curiosity Nexus"
+              active={
+                activeView ===
+                "nexus"
+              }
+              onClick={() =>
+                setActiveView(
+                  "nexus",
+                )
+              }
+            />
+
           </nav>
 
           <div className="mt-auto border-t border-white/[0.06] pt-5">
@@ -2313,6 +2330,12 @@ function App() {
               {activeView === "dna" && (
                 <ErrorBoundary fallbackTitle="Interest DNA view failed to load">
                   <DnaWorkspaceView source={importSource} />
+                </ErrorBoundary>
+              )}
+
+              {activeView === "nexus" && (
+                <ErrorBoundary fallbackTitle="Curiosity Nexus view failed to load">
+                  <NexusWorkspaceView source={importSource} />
                 </ErrorBoundary>
               )}
 

@@ -292,6 +292,18 @@ def detect_rabbit_holes(
 
             "topic_count":
                 len(topics),
+
+            "events": [
+                {
+                    "title": e.get("title") or "Untitled",
+                    "source": e.get("source") or "unknown",
+                    "timestamp": (parse_timestamp(e.get("timestamp")) or datetime.utcnow()).isoformat(),
+                    "topic": e.get("topic") or "Other",
+                    "artist": e.get("artist"),
+                    "url": e.get("url"),
+                }
+                for e in session
+            ],
         })
 
     return sorted(

@@ -28,7 +28,7 @@ Drifter analyses your digital footprint across **YouTube**, **Spotify**, **GitHu
 ### 🎨 Modern Visual Dashboard
 
 - **Interactive 2D/3D Interest Maps** — Three.js, React Three Fiber, Recharts.
-- **8 Workspace Views** — Overview, Interest Map, Evolution, Behavior, History, Prediction, Correlation, Interest DNA.
+- **9 Workspace Views** — Overview, Interest Map, Curiosity Nexus, Evolution, Behavior, History, Prediction, Correlation, Interest DNA.
 - **Year-in-Drift Report** — A 5-chapter *Spotify Wrapped*-style story: Scale → Gravity Well → The Pivot → The Deep Dive → Your Archetype.
 - **Data Import & Extension Sync Modal** — Frictionless OAuth management, 1-click extension token pairing, Google Takeout archive import.
 
@@ -292,6 +292,7 @@ This starts the backend and frontend in containers. Configure credentials via yo
 |---|---|
 | **Overview** | High-level stats, source breakdown, top topics |
 | **Interest Map** | Interactive 2D/3D cluster visualisation (Three.js) |
+| **Curiosity Nexus** | AI cross-disciplinary bridge finder connecting divergent interests |
 | **Evolution** | Monthly drift velocity & emerging / fading topic arcs |
 | **Behavior** | Rabbit-hole sessions, streaks, nocturnal patterns |
 | **History** | Searchable & filterable raw event log with delete support |

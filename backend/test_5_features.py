@@ -72,4 +72,13 @@ print("✓ Feature 4 (Correlation): Passed. Synergy score:", corr_res["synergy_s
 dna_res = generate_interest_dna(assignments=events, analysis=analysis)
 assert "dna_id" in dna_res and "traits" in dna_res, "DNA generation failed"
 print("✓ Feature 5 (Interest DNA): Passed. Archetype:", dna_res["archetype"], "ID:", dna_res["dna_id"])
-print("\nAll 5 feature backends verified successfully!")
+
+# 6. Test Curiosity Nexus
+from app.analytics.nexus import generate_curiosity_nexus
+nexus_res = generate_curiosity_nexus(assignments=events, analysis=analysis)
+assert nexus_res["status"] == "READY", "Nexus status not READY"
+assert "bridge_title" in nexus_res and "serendipity_score" in nexus_res, "Nexus bridge fields missing"
+assert len(nexus_res["recommendations"]["watch"]) > 0, "Nexus recommendations missing"
+print("✓ Feature 6 (Curiosity Nexus): Passed. Bridge:", nexus_res["bridge_title"], f"({nexus_res['topic_a']} × {nexus_res['topic_b']})", "Serendipity:", f"{nexus_res['serendipity_score']}%")
+
+print("\nAll 6 feature backends verified successfully!")

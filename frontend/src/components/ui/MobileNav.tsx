@@ -7,12 +7,14 @@ import {
   Dna,
   History,
   Shuffle,
+  Sparkles,
   TrendingUp,
 } from "lucide-react";
 import type { WorkspaceView } from "@/components/dashboard/WorkspaceViews";
 
 const NAV_ITEMS: { icon: React.ReactNode; label: string; view: WorkspaceView }[] = [
   { icon: <Activity size={20} />, label: "Overview", view: "overview" },
+  { icon: <Sparkles size={20} />, label: "Nexus", view: "nexus" },
   { icon: <Brain size={20} />, label: "Map", view: "map" },
   { icon: <TrendingUp size={20} />, label: "Evolution", view: "evolution" },
   { icon: <Compass size={20} />, label: "Predict", view: "prediction" },

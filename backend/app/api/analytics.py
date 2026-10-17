@@ -26,6 +26,7 @@ from app.reports.year_in_drift import generate_year_in_drift_report
 from app.prediction.next_interest import predict_next_interests
 from app.analytics.correlation import analyze_cross_platform_correlation
 from app.reports.interest_dna import generate_interest_dna
+from app.analytics.nexus import generate_curiosity_nexus
 
 
 router = APIRouter()
@@ -705,4 +706,44 @@ def get_interest_dna_profile(
     return generate_interest_dna(
         assignments=assignments,
         analysis=analysis,
+    )
+
+
+# ============================================================
+# FEATURE 6: CURIOSITY NEXUS (CROSS-DOMAIN SERENDIPITY)
+# ============================================================
+
+class NexusRequest(BaseModel):
+    topic_a: str | None = None
+    topic_b: str | None = None
+    source: str | None = None
+
+
+@router.post("/nexus")
+def post_curiosity_nexus(
+    payload: NexusRequest,
+    user_id: int = Depends(get_current_user_id),
+):
+    analysis, assignments = _load_user_analysis_and_events(user_id=user_id, source=payload.source)
+    return generate_curiosity_nexus(
+        assignments=assignments,
+        analysis=analysis,
+        topic_a=payload.topic_a,
+        topic_b=payload.topic_b,
+    )
+
+
+@router.get("/nexus")
+def get_curiosity_nexus_endpoint(
+    topic_a: str | None = None,
+    topic_b: str | None = None,
+    source: str | None = None,
+    user_id: int = Depends(get_current_user_id),
+):
+    analysis, assignments = _load_user_analysis_and_events(user_id=user_id, source=source)
+    return generate_curiosity_nexus(
+        assignments=assignments,
+        analysis=analysis,
+        topic_a=topic_a,
+        topic_b=topic_b,
     )

@@ -8,6 +8,7 @@ import {
   Brain,
   CalendarDays,
   Check,
+  ChevronRight,
   Clock3,
   Compass,
   Dna,
@@ -28,6 +29,7 @@ import {
   TrendingDown,
   TrendingUp,
   Upload,
+  X,
   Zap,
 } from "lucide-react";
 import {
@@ -51,6 +53,8 @@ import PredictionView from "@/components/prediction/PredictionView";
 import CorrelationView from "@/components/analytics/CorrelationView";
 import InterestDnaCard from "@/components/reports/InterestDnaCard";
 import PlatformIntelligenceHub from "@/components/analytics/PlatformIntelligenceHub";
+import CuriosityNexusView from "@/components/analytics/CuriosityNexusView";
+import NumberTicker from "@/components/ui/NumberTicker";
 import type { DashboardData } from "@/services/analytics";
 import { deleteHistoryEvent, clearHistory, type HistoryEvent } from "@/services/history";
 
@@ -63,7 +67,8 @@ export type WorkspaceView =
   | "history"
   | "prediction"
   | "correlation"
-  | "dna";
+  | "dna"
+  | "nexus";
 
 interface WorkspaceProps {
   dashboard: DashboardData;
@@ -211,7 +216,7 @@ export function OverviewView({
       />
 
       {/* QUICK FEATURE LAUNCHPAD */}
-      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         <button
           onClick={() => onOpenView("map")}
           className="group relative flex flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-left backdrop-blur-md transition-all hover:-translate-y-1 hover:border-amber-400/40 hover:bg-white/[0.05] hover:shadow-xl hover:shadow-amber-500/10"
@@ -229,6 +234,22 @@ export function OverviewView({
         </button>
 
         <button
+          onClick={() => onOpenView("nexus")}
+          className="group relative flex flex-col justify-between rounded-2xl border border-amber-400/30 bg-amber-500/[0.04] p-4 text-left backdrop-blur-md transition-all hover:-translate-y-1 hover:border-amber-400 hover:bg-amber-500/[0.08] hover:shadow-xl hover:shadow-amber-500/15"
+        >
+          <div className="flex items-center justify-between w-full mb-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-400/20 text-amber-300 group-hover:scale-110 transition">
+              <Sparkles size={18} />
+            </div>
+            <span className="rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-300 border border-amber-400/30">NEW</span>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-white group-hover:text-amber-300 transition">Curiosity Nexus</h3>
+            <p className="mt-1 text-xs text-white/50 leading-relaxed">AI cross-disciplinary bridges</p>
+          </div>
+        </button>
+
+        <button
           onClick={() => onOpenView("prediction")}
           className="group relative flex flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-left backdrop-blur-md transition-all hover:-translate-y-1 hover:border-purple-400/40 hover:bg-white/[0.05] hover:shadow-xl hover:shadow-purple-500/10"
         >
@@ -240,7 +261,7 @@ export function OverviewView({
           </div>
           <div>
             <h3 className="text-sm font-semibold text-white group-hover:text-purple-400 transition">AI Predictions</h3>
-            <p className="mt-1 text-xs text-white/50 leading-relaxed">Markov interest horizon forecasts</p>
+            <p className="mt-1 text-xs text-white/50 leading-relaxed">Markov horizon forecasts</p>
           </div>
         </button>
 
@@ -256,7 +277,7 @@ export function OverviewView({
           </div>
           <div>
             <h3 className="text-sm font-semibold text-white group-hover:text-cyan-400 transition">Interest DNA</h3>
-            <p className="mt-1 text-xs text-white/50 leading-relaxed">Curiosity entropy & cognitive profile</p>
+            <p className="mt-1 text-xs text-white/50 leading-relaxed">Entropy & cognitive archetype</p>
           </div>
         </button>
 
@@ -286,7 +307,14 @@ export function OverviewView({
           <span className="signal-label">Current center of gravity</span>
           <strong className="text-2xl font-bold tracking-tight text-white">{dominant}</strong>
           <p className="mt-2 text-xs text-white/60">
-            {eventCount.toLocaleString()} total events indexed across {overview.topics} distinct topic clusters.
+            <span className="font-semibold text-white/90">
+              <NumberTicker value={eventCount} />
+            </span>{" "}
+            total events indexed across{" "}
+            <span className="font-semibold text-white/90">
+              <NumberTicker value={overview.topics || 0} />
+            </span>{" "}
+            distinct topic clusters.
           </p>
           <button onClick={() => onOpenView("map")} className="text-action mt-3 inline-flex items-center gap-1 text-xs font-semibold text-amber-400 hover:text-amber-300">
             Explore cluster in vector space <ArrowUpRight size={14} />
@@ -295,7 +323,9 @@ export function OverviewView({
 
         <div className="signal-card relative overflow-hidden group">
           <span className="signal-label">Latest drift velocity</span>
-          <strong className="text-2xl font-bold tracking-tight text-white">{overview.current_drift.toFixed(3)}</strong>
+          <strong className="text-2xl font-bold tracking-tight text-white">
+            <NumberTicker value={overview.current_drift || 0} decimals={3} />
+          </strong>
           <p className="mt-2 text-xs text-white/60">
             Rate of change in your interest distribution over recent timeline windows.
           </p>
@@ -306,7 +336,9 @@ export function OverviewView({
 
         <div className="signal-card relative overflow-hidden group">
           <span className="signal-label">Emerging focus paths</span>
-          <strong className="text-2xl font-bold tracking-tight text-white">{dashboard.evolution.emerging.length}</strong>
+          <strong className="text-2xl font-bold tracking-tight text-white">
+            <NumberTicker value={dashboard.evolution?.emerging?.length || 0} />
+          </strong>
           <p className="mt-2 text-xs text-white/60">
             Newly detected curiosity directions in your media streams.
           </p>
@@ -450,7 +482,31 @@ export function EvolutionView({ dashboard, onOpenView }: WorkspaceProps) {
 }
 
 
+interface RabbitHoleEvent {
+  title: string;
+  source: string;
+  timestamp: string;
+  topic?: string;
+  artist?: string | null;
+  url?: string | null;
+}
+
+interface RabbitHoleItem {
+  start?: string;
+  end?: string;
+  duration_minutes?: number;
+  event_count?: number;
+  count?: number;
+  dominant_topic?: string;
+  topic?: string;
+  name?: string;
+  topic_count?: number;
+  events?: RabbitHoleEvent[];
+}
+
 export function BehaviorView({ dashboard, onOpenView }: WorkspaceProps) {
+  const [selectedHole, setSelectedHole] = useState<RabbitHoleItem | null>(null);
+
   const behavior = dashboard?.behavior || {
     time_of_day: {},
     day_of_week: {},
@@ -501,17 +557,21 @@ export function BehaviorView({ dashboard, onOpenView }: WorkspaceProps) {
       <div className="signal-grid">
         <div className="signal-card">
           <span className="signal-label">Rabbit holes</span>
-          <strong>{behavior.rabbit_holes?.length || 0}</strong>
+          <strong className="text-2xl font-bold tracking-tight text-white">
+            <NumberTicker value={behavior.rabbit_holes?.length || 0} />
+          </strong>
           <p>Deep sessions where one thread kept pulling you onward.</p>
         </div>
         <div className="signal-card">
           <span className="signal-label">Topic transitions</span>
-          <strong>{behavior.topic_transitions?.length || 0}</strong>
+          <strong className="text-2xl font-bold tracking-tight text-white">
+            <NumberTicker value={behavior.topic_transitions?.length || 0} />
+          </strong>
           <p>Moves between different interest neighborhoods.</p>
         </div>
         <div className="signal-card">
           <span className="signal-label">Concentration</span>
-          <strong>{concentrationVal}</strong>
+          <strong className="text-2xl font-bold tracking-tight text-white">{concentrationVal}</strong>
           <p>
             {concentration.dominant_topic
               ? `Main focus: ${concentration.dominant_topic}`
@@ -563,10 +623,19 @@ export function BehaviorView({ dashboard, onOpenView }: WorkspaceProps) {
               const evCount = hole.event_count || hole.count || "";
               const duration = hole.duration_minutes ? `${Math.round(Number(hole.duration_minutes))}m` : "";
               return (
-                <div className="trace-row" key={index}>
-                  <span className="trace-number">{index + 1}</span>
-                  <div>
-                    <strong>{domTopic}</strong>
+                <button
+                  type="button"
+                  key={index}
+                  onClick={() => setSelectedHole(hole as RabbitHoleItem)}
+                  className="trace-row group w-full text-left transition hover:bg-white/[0.04] cursor-pointer"
+                  title="Click to view full rabbit hole session timeline"
+                >
+                  <span className="trace-number group-hover:text-amber-400 transition">{index + 1}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <strong className="group-hover:text-amber-300 transition truncate">{domTopic}</strong>
+                      <ChevronRight size={14} className="text-white/30 group-hover:translate-x-0.5 group-hover:text-amber-400 transition shrink-0" />
+                    </div>
                     <span>
                       {[
                         evCount ? `${evCount} events` : null,
@@ -576,13 +645,165 @@ export function BehaviorView({ dashboard, onOpenView }: WorkspaceProps) {
                         .join(" · ")}
                     </span>
                   </div>
-                </div>
+                </button>
               );
             })}
             {!behavior.rabbit_holes?.length && <Empty message="No rabbit holes detected yet." />}
           </div>
         </Panel>
       </div>
+
+      {/* RABBIT HOLE INTERACTIVE DEEP DIVE MODAL */}
+      {selectedHole && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 backdrop-blur-md"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setSelectedHole(null);
+          }}
+        >
+          <div className="relative w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0c0c0c] shadow-[0_0_60px_rgba(0,0,0,0.85)]">
+            {/* Ambient background glow */}
+            <div
+              className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-44 w-96 rounded-full blur-3xl opacity-25"
+              style={{ background: topicColor(selectedHole.dominant_topic || selectedHole.topic || "Exploration") }}
+            />
+
+            {/* Header */}
+            <div className="relative flex items-start justify-between border-b border-white/[0.08] p-6">
+              <div className="flex items-start gap-3.5">
+                <div
+                  className="flex h-11 w-11 items-center justify-center rounded-2xl border"
+                  style={{
+                    borderColor: `${topicColor(selectedHole.dominant_topic || "Exploration")}40`,
+                    background: `${topicColor(selectedHole.dominant_topic || "Exploration")}15`,
+                    color: topicColor(selectedHole.dominant_topic || "Exploration"),
+                  }}
+                >
+                  <GitBranch size={20} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-white/40">
+                      Rabbit Hole Deep Dive
+                    </span>
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[10px] font-semibold border"
+                      style={{
+                        borderColor: `${topicColor(selectedHole.dominant_topic || "Exploration")}50`,
+                        background: `${topicColor(selectedHole.dominant_topic || "Exploration")}20`,
+                        color: topicColor(selectedHole.dominant_topic || "Exploration"),
+                      }}
+                    >
+                      {selectedHole.dominant_topic || selectedHole.topic || "Exploration"}
+                    </span>
+                  </div>
+                  <h2 className="mt-1 text-lg font-bold text-white">
+                    {selectedHole.dominant_topic || selectedHole.name || "Curiosity Loop"}
+                  </h2>
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-white/60">
+                    <span className="flex items-center gap-1.5 font-medium text-white/80">
+                      <Clock3 size={13} className="text-amber-400" />
+                      {selectedHole.duration_minutes
+                        ? `${Math.round(selectedHole.duration_minutes)} minutes`
+                        : "Continuous session"}
+                    </span>
+                    <span>·</span>
+                    <span className="flex items-center gap-1.5 font-medium text-white/80">
+                      <Flame size={13} className="text-rose-400" />
+                      <NumberTicker value={selectedHole.event_count || selectedHole.count || selectedHole.events?.length || 0} /> traces captured
+                    </span>
+                    {selectedHole.start && (
+                      <>
+                        <span>·</span>
+                        <span className="text-white/40">
+                          {new Date(selectedHole.start).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedHole(null)}
+                className="rounded-xl p-2 text-white/40 transition hover:bg-white/[0.06] hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Events timeline body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {selectedHole.events && selectedHole.events.length > 0 ? (
+                <div className="relative pl-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-[2px] before:bg-white/10 space-y-4">
+                  {selectedHole.events.map((ev, i) => (
+                    <div key={i} className="relative flex items-start gap-3 group">
+                      {/* Timeline node */}
+                      <div
+                        className="absolute -left-6 top-1 h-3.5 w-3.5 rounded-full border-2 border-[#0c0c0c] transition group-hover:scale-125"
+                        style={{
+                          backgroundColor: topicColor(ev.topic || selectedHole.dominant_topic || "Exploration", i),
+                        }}
+                      />
+                      <div className="min-w-0 flex-1 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 transition hover:border-white/15 hover:bg-white/[0.05]">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/[0.06] text-white/60">
+                            {ev.source}
+                          </span>
+                          <time className="text-[10px] text-white/40">
+                            {new Date(ev.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </time>
+                        </div>
+                        <h4 className="mt-1 text-sm font-medium text-white/90 truncate">
+                          {ev.title}
+                        </h4>
+                        {ev.artist && (
+                          <p className="text-xs text-white/50 truncate mt-0.5">{ev.artist}</p>
+                        )}
+                        {ev.url && (
+                          <a
+                            href={ev.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 hover:text-amber-300"
+                          >
+                            Open event link <ExternalLink size={11} />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-10 space-y-2">
+                  <p className="text-sm text-white/60">
+                    This rabbit hole spanned {selectedHole.duration_minutes ? `${Math.round(selectedHole.duration_minutes)} minutes` : "a focused session"} with {selectedHole.event_count || selectedHole.count || 0} events.
+                  </p>
+                  <p className="text-xs text-white/40">
+                    Sequential flow detected in your interest cluster. Re-analyzing or refreshing data updates live event traces.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-white/[0.06] bg-white/[0.02] px-6 py-3 flex items-center justify-between text-xs text-white/40">
+              <span>Clustered by temporal continuity and semantic density</span>
+              <button
+                onClick={() => setSelectedHole(null)}
+                className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/20"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -816,7 +1037,7 @@ export function HistoryView({ dashboard, history, historyLoading, onRefresh }: W
             />
           </div>
           <span className="history-count">
-            {filtered.length} of {localHistory.length} events
+            <NumberTicker value={filtered.length} /> of <NumberTicker value={localHistory.length} /> events
           </span>
         </div>
 
@@ -1055,4 +1276,9 @@ export function CorrelationWorkspaceView() {
 export function DnaWorkspaceView({ source }: { source?: string }) {
   return <InterestDnaCard source={source} />;
 }
+
+export function NexusWorkspaceView({ source }: { source?: string }) {
+  return <CuriosityNexusView source={source} />;
+}
+
 
