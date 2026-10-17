@@ -13,7 +13,13 @@ import {
   Search,
   Filter,
   Eye,
+  Clock,
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
 } from "lucide-react";
+import { useEffect } from "react";
 import type { DashboardData } from "../services/analytics";
 
 export interface InterestPoint {
@@ -61,6 +67,40 @@ export default function InterestMap({ data }: Props) {
   const [selectedPoint, setSelectedPoint] = useState<InterestPoint | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [timeMachineOpen, setTimeMachineOpen] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [timeStep, setTimeStep] = useState(100);
+
+  // Compute chronologically sorted timestamps
+  const sortedTimestamps = useMemo(() => {
+    return points
+      .map((p) => new Date(p.timestamp || "").getTime())
+      .filter((t) => !isNaN(t) && t > 0)
+      .sort((a, b) => a - b);
+  }, [points]);
+
+  const minTimestamp = sortedTimestamps[0] || Date.now() - 30 * 86400000;
+  const maxTimestamp = sortedTimestamps[sortedTimestamps.length - 1] || Date.now();
+
+  const currentCutoff = useMemo(() => {
+    if (!timeMachineOpen || sortedTimestamps.length === 0) return Infinity;
+    return minTimestamp + (timeStep / 100) * (maxTimestamp - minTimestamp);
+  }, [timeMachineOpen, sortedTimestamps, minTimestamp, maxTimestamp, timeStep]);
+
+  // Auto-play time machine
+  useEffect(() => {
+    if (!isPlaying) return;
+    const interval = setInterval(() => {
+      setTimeStep((s) => {
+        if (s >= 100) {
+          setIsPlaying(false);
+          return 100;
+        }
+        return Math.min(100, s + 2);
+      });
+    }, 160);
+    return () => clearInterval(interval);
+  }, [isPlaying]);
 
   // Extract unique topics with counts
   const topicStats = useMemo(() => {
@@ -78,7 +118,7 @@ export default function InterestMap({ data }: Props) {
       .sort((a, b) => b.count - a.count);
   }, [points]);
 
-  // Filter points based on selected topic & search
+  // Filter points based on selected topic, search, and time cutoff
   const filteredPoints = useMemo(() => {
     return points.filter((p) => {
       const matchTopic = !selectedTopic || (p.topic || "Unknown") === selectedTopic;
@@ -87,9 +127,11 @@ export default function InterestMap({ data }: Props) {
         p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (p.artist || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (p.topic || "").toLowerCase().includes(searchQuery.toLowerCase());
-      return matchTopic && matchQuery;
+      const pTime = p.timestamp ? new Date(p.timestamp).getTime() : 0;
+      const matchTime = !timeMachineOpen || pTime <= currentCutoff;
+      return matchTopic && matchQuery && matchTime;
     });
-  }, [points, selectedTopic, searchQuery]);
+  }, [points, selectedTopic, searchQuery, timeMachineOpen, currentCutoff]);
 
   // Normalize 2D points to 10% - 90% canvas coordinate range
   const normalizedPoints = useMemo(() => {
@@ -290,6 +332,8 @@ export default function InterestMap({ data }: Props) {
                 setSelectedTopic(null);
                 setSearchQuery("");
                 setSelectedPoint(null);
+                setTimeStep(100);
+                setIsPlaying(false);
               }}
               className="p-1.5 text-neutral-400 hover:text-white transition"
               title="Reset View"
@@ -297,6 +341,28 @@ export default function InterestMap({ data }: Props) {
               <RotateCcw size={13} />
             </button>
           </div>
+
+          {/* TIME MACHINE TOGGLE BUTTON */}
+          <button
+            onClick={() => {
+              setTimeMachineOpen(!timeMachineOpen);
+              if (!timeMachineOpen) {
+                setTimeStep(30);
+              } else {
+                setIsPlaying(false);
+                setTimeStep(100);
+              }
+            }}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all border ${
+              timeMachineOpen
+                ? "bg-amber-400/20 text-amber-300 border-amber-400/40 shadow-sm shadow-amber-400/20"
+                : "border-white/10 bg-white/[0.04] text-neutral-300 hover:text-white"
+            }`}
+            title="Scrub timeline to watch clusters emerge and drift"
+          >
+            <Clock size={12} className={isPlaying ? "animate-spin text-amber-400" : ""} />
+            <span>Time Machine</span>
+          </button>
         </div>
       </div>
 
@@ -513,6 +579,86 @@ export default function InterestMap({ data }: Props) {
           <Sparkles size={12} className="text-purple-400" />
           <span>{normalizedPoints.length} points plotted in semantic space</span>
         </div>
+
+        {/* TIME MACHINE FLOATING DOCK */}
+        {timeMachineOpen && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 w-[92%] max-w-xl rounded-2xl border border-amber-400/30 bg-black/90 p-4 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-3 duration-200">
+            <div className="flex items-center justify-between text-xs mb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                  Cluster Time Machine
+                </span>
+                <span className="text-white/30">·</span>
+                <strong className="text-white font-medium text-xs">
+                  {new Date(currentCutoff).toLocaleDateString(undefined, {
+                    month: "short",
+                    year: "numeric",
+                    day: "numeric",
+                  })}
+                </strong>
+              </div>
+              <span className="text-[11px] font-mono text-white/50">
+                {filteredPoints.length} of {points.length} formed ({timeStep}%)
+              </span>
+            </div>
+
+            {/* Slider & playback controls */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsPlaying(!isPlaying)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-400/20 text-amber-300 border border-amber-400/40 hover:bg-amber-400/30 transition shadow-sm"
+                title={isPlaying ? "Pause simulation" : "Play timeline forward"}
+              >
+                {isPlaying ? <Pause size={13} /> : <Play size={13} className="ml-0.5" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTimeStep((s) => Math.max(0, s - 10))}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] text-white/60 hover:text-white hover:bg-white/[0.08] transition"
+                title="Step backward"
+              >
+                <SkipBack size={12} />
+              </button>
+
+              {/* Scrubber Range Input */}
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={timeStep}
+                onChange={(e) => {
+                  setTimeStep(Number(e.target.value));
+                  setIsPlaying(false);
+                }}
+                className="flex-1 accent-amber-400 cursor-pointer h-1.5 rounded-lg bg-white/10"
+              />
+
+              <button
+                type="button"
+                onClick={() => setTimeStep((s) => Math.min(100, s + 10))}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] text-white/60 hover:text-white hover:bg-white/[0.08] transition"
+                title="Step forward"
+              >
+                <SkipForward size={12} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setTimeMachineOpen(false);
+                  setIsPlaying(false);
+                  setTimeStep(100);
+                }}
+                className="text-[10px] text-white/40 hover:text-white px-1.5 py-1"
+              >
+                Exit
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
