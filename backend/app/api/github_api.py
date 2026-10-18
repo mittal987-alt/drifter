@@ -9,6 +9,7 @@ Flow:
   5. Redirect back to frontend /
 """
 
+import hmac
 import secrets
 from datetime import datetime
 from urllib.parse import urlencode
@@ -99,7 +100,7 @@ async def github_callback(
         return RedirectResponse(f"{frontend}/?github_error=no_code")
 
     expected_state = request.session.pop("github_oauth_state", None)
-    if expected_state and state != expected_state:
+    if not expected_state or not state or not hmac.compare_digest(state, expected_state):
         return RedirectResponse(f"{frontend}/?github_error=state_mismatch")
 
     user_id = request.session.get("user_id")

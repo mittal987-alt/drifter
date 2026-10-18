@@ -92,11 +92,45 @@ def is_ad_or_promotional(title: str, artist: str | None = None) -> bool:
     return any(sig in low for sig in ad_signatures)
 
 
+class _EventAdapter:
+    """
+    Thin adapter so prepare_events works with both SQLAlchemy ORM objects
+    (the production path via analyze_user_history) and plain dicts (tests
+    and ad-hoc calls to build_interest_analysis).
+    """
+
+    __slots__ = (
+        "id", "timestamp", "source", "title",
+        "artist", "url", "duration", "event_hash",
+    )
+
+    def __init__(self, obj):
+        if isinstance(obj, dict):
+            self.id        = obj.get("id") or obj.get("event_id")
+            self.timestamp = obj.get("timestamp")
+            self.source    = obj.get("source", "")
+            self.title     = obj.get("title", "")
+            self.artist    = obj.get("artist")
+            self.url       = obj.get("url")
+            self.duration  = obj.get("duration")
+            self.event_hash = obj.get("event_hash", "")
+        else:
+            # SQLAlchemy ORM model — access attributes directly
+            self.id        = obj.id
+            self.timestamp = obj.timestamp
+            self.source    = obj.source
+            self.title     = obj.title
+            self.artist    = getattr(obj, "artist", None)
+            self.url       = getattr(obj, "url", None)
+            self.duration  = getattr(obj, "duration", None)
+            self.event_hash = getattr(obj, "event_hash", "")
+
+
 def prepare_events(
     events: list[Any],
 ) -> list[dict[str, Any]]:
     """
-    Convert database HistoryEvent objects into
+    Convert database HistoryEvent objects *or* plain dicts into
     clean analysis records.
     """
 
@@ -104,7 +138,8 @@ def prepare_events(
 
     seen = set()
 
-    for event in events:
+    for raw in events:
+        event = _EventAdapter(raw)
 
         title = clean_title(event.title)
 
@@ -158,6 +193,7 @@ def prepare_events(
         )
 
     return prepared
+
 
 
 def run_analysis_pipeline(

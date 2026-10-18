@@ -44,8 +44,14 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Secrets and OAuth keys are injected via a .env file at the repo root.
+    # Do NOT hardcode real credentials here.
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-drifter}:${POSTGRES_PASSWORD:-drifter_secret_password}@postgres:5432/${POSTGRES_DB:-drifter}
+      # Override DB URL to use the Docker-internal postgres service name.
+      # Uses psycopg2 (synchronous) — do NOT use asyncpg here.
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-drifter}:${POSTGRES_PASSWORD:-drifter_secret_password}@postgres:5432/${POSTGRES_DB:-drifter}
       REDIS_URL: redis://redis:6379/0
       PORT: 8000
     ports:

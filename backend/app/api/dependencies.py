@@ -13,7 +13,7 @@ def generate_extension_token(user_id: int) -> str:
         settings.SESSION_SECRET.encode(),
         f"ext_{user_id}".encode(),
         hashlib.sha256,
-    ).hexdigest()[:16]
+    ).hexdigest()[:32]
     return f"drifter_ext_{user_id}_{sig}"
 
 
@@ -34,12 +34,13 @@ def verify_extension_token(token: str) -> int | None:
         if len(parts) >= 4:
             user_id = int(parts[2])
             sig = parts[3]
-            expected_sig = hmac.new(
+            full_sig = hmac.new(
                 settings.SESSION_SECRET.encode(),
                 f"ext_{user_id}".encode(),
                 hashlib.sha256,
-            ).hexdigest()[:16]
-            if hmac.compare_digest(sig, expected_sig):
+            ).hexdigest()
+            # Verify against 32-char (current) or 16-char (legacy) signature
+            if hmac.compare_digest(sig, full_sig[:32]) or hmac.compare_digest(sig, full_sig[:16]):
                 return user_id
     except Exception:
         pass
@@ -51,6 +52,7 @@ def get_current_user_id(
 ) -> int:
     """
     Get the current user ID from an extension token or authenticated session.
+    Enforces active user checks (Step 2 & Step 4).
     """
     # 1. Check Bearer token / X-Sync-Token header
     auth_header = request.headers.get("authorization") or request.headers.get("x-sync-token")
@@ -61,6 +63,8 @@ def get_current_user_id(
             try:
                 user = db.query(User).filter(User.id == token_user_id).first()
                 if user:
+                    if getattr(user, "is_active", True) is False:
+                        raise HTTPException(status_code=403, detail="Account is deactivated.")
                     return int(user.id)
             finally:
                 db.close()
@@ -73,6 +77,9 @@ def get_current_user_id(
         if user_id:
             user = db.query(User).filter(User.id == int(user_id)).first()
             if user:
+                if getattr(user, "is_active", True) is False:
+                    request.session.clear()
+                    raise HTTPException(status_code=403, detail="Account is deactivated.")
                 return int(user.id)
 
         raise HTTPException(

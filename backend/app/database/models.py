@@ -1,16 +1,41 @@
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     Float,
+    ForeignKey,
     Integer,
     String,
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.orm import relationship
+from sqlalchemy.types import TypeDecorator
 
 from app.database.database import Base
+from app.services.crypto import encrypt_token, decrypt_token
+
+
+class EncryptedToken(TypeDecorator):
+    """
+    SQLAlchemy TypeDecorator that encrypts sensitive OAuth tokens at rest
+    using authenticated Fernet encryption, and decrypts them on load.
+    Transparently falls back to plaintext if the token is not prefixed with 'v1:'.
+    """
+    impl = Text
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None and isinstance(value, str):
+            return encrypt_token(value)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None and isinstance(value, str):
+            return decrypt_token(value)
+        return value
 
 
 # =========================================================
@@ -43,9 +68,37 @@ class User(Base):
         nullable=True,
     )
 
+    is_active = Column(
+        Boolean,
+        default=True,
+        nullable=False,
+    )
+
     created_at = Column(
         DateTime,
         default=datetime.utcnow,
+    )
+
+    # Relationships with cascade for clean account data wiping
+    connections = relationship(
+        "Connection",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    history_events = relationship(
+        "HistoryEvent",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    analysis_results = relationship(
+        "AnalysisResult",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    export_jobs = relationship(
+        "PortabilityExportJob",
+        back_populates="user",
+        cascade="all, delete-orphan",
     )
 
 
@@ -64,6 +117,7 @@ class Connection(Base):
 
     user_id = Column(
         Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -71,15 +125,16 @@ class Connection(Base):
     provider = Column(
         String(50),
         nullable=False,
+        index=True,
     )
 
     access_token = Column(
-        Text,
+        EncryptedToken,
         nullable=False,
     )
 
     refresh_token = Column(
-        Text,
+        EncryptedToken,
         nullable=True,
     )
 
@@ -98,6 +153,16 @@ class Connection(Base):
         default=datetime.utcnow,
     )
 
+    user = relationship("User", back_populates="connections")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "provider",
+            name="uq_user_provider",
+        ),
+    )
+
 
 # =========================================================
 # HISTORY EVENT
@@ -114,6 +179,7 @@ class HistoryEvent(Base):
 
     user_id = Column(
         Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -166,6 +232,8 @@ class HistoryEvent(Base):
         default=datetime.utcnow,
     )
 
+    user = relationship("User", back_populates="history_events")
+
     __table_args__ = (
         UniqueConstraint(
             "user_id",
@@ -190,6 +258,7 @@ class AnalysisResult(Base):
 
     user_id = Column(
         Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -233,6 +302,8 @@ class AnalysisResult(Base):
         onupdate=datetime.utcnow,
     )
 
+    user = relationship("User", back_populates="analysis_results")
+
 
 # =========================================================
 # GOOGLE DATA PORTABILITY EXPORT JOB
@@ -249,6 +320,7 @@ class PortabilityExportJob(Base):
 
     user_id = Column(
         Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -299,3 +371,5 @@ class PortabilityExportJob(Base):
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
     )
+
+    user = relationship("User", back_populates="export_jobs")

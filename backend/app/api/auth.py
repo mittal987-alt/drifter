@@ -151,15 +151,21 @@ def register(
         raise HTTPException(status_code=400, detail="An account with this email already exists.")
 
     # -------------------------------------------------------
-    # Smart guest-claim: if there is exactly ONE guest user
-    # (no email, no password hash) with history events, upgrade
-    # that user in-place so no data is lost.
+    # Smart guest-claim: only if current session user is a guest
+    # (no email, no password hash), upgrade that user in-place
+    # so no data is lost. Never claim another user's guest account.
     # -------------------------------------------------------
-    guest_user = (
-        db.query(User)
-        .filter(User.email == None, User.password_hash == None)  # noqa: E711
-        .first()
-    )
+    session_user_id = request.session.get("user_id")
+    guest_user = None
+    if session_user_id:
+        try:
+            guest_user = (
+                db.query(User)
+                .filter(User.id == int(session_user_id), User.email == None, User.password_hash == None)  # noqa: E711
+                .first()
+            )
+        except Exception:
+            guest_user = None
     if guest_user:
         guest_user.email = email
         guest_user.password_hash = hash_password(payload.password)
@@ -245,12 +251,15 @@ def get_user_sync_token(
 # ---------------------------------------------------------
 
 @router.get("/google/login")
-def google_login():
+def google_login(request: Request):
     if not settings.GOOGLE_CLIENT_ID:
         raise HTTPException(
             status_code=500,
             detail="GOOGLE_CLIENT_ID is not configured.",
         )
+
+    state = secrets.token_urlsafe(32)
+    request.session["google_oauth_state"] = state
 
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
@@ -259,13 +268,14 @@ def google_login():
         ),
         "response_type": "code",
         "scope": (
-    "openid "
-    "https://www.googleapis.com/auth/userinfo.profile "
-    "https://www.googleapis.com/auth/youtube.readonly "
-    "https://www.googleapis.com/auth/dataportability.myactivity.youtube"
-),
+            "openid "
+            "https://www.googleapis.com/auth/userinfo.profile "
+            "https://www.googleapis.com/auth/youtube.readonly "
+            "https://www.googleapis.com/auth/dataportability.myactivity.youtube"
+        ),
         "access_type": "offline",
         "prompt": "consent",
+        "state": state,
     }
 
     url = (
@@ -417,6 +427,11 @@ async def google_callback(
             f"{settings.FRONTEND_URL}/?google_error={error}"
         )
 
+    state = request.query_params.get("state")
+    expected_state = request.session.pop("google_oauth_state", None)
+    if not state or not expected_state or not hmac.compare_digest(state, expected_state):
+        raise HTTPException(status_code=400, detail="Invalid Google OAuth state.")
+
     try:
         code = request.query_params.get("code")
 
@@ -489,7 +504,7 @@ async def google_callback(
             )
 
         # -----------------------------------------------------
-        # Find/create application user
+        # Find/create application user (safe: never attach to first user)
         # -----------------------------------------------------
 
         user_id = request.session.get("user_id")
@@ -501,11 +516,17 @@ async def google_callback(
                 .filter(User.id == int(user_id))
                 .first()
             )
-        else:
-            user = db.query(User).first()
-
+        if not user and google_user.get("email"):
+            user = (
+                db.query(User)
+                .filter(User.email == google_user.get("email").strip().lower())
+                .first()
+            )
         if not user:
-            user = User()
+            user = User(
+                email=google_user.get("email").strip().lower() if google_user.get("email") else None,
+                name=google_user.get("name") or google_user.get("given_name"),
+            )
             db.add(user)
             db.commit()
             db.refresh(user)
@@ -578,7 +599,7 @@ async def google_callback(
 # ---------------------------------------------------------
 
 @router.get("/spotify/login")
-def spotify_login():
+def spotify_login(request: Request):
     if not settings.SPOTIFY_CLIENT_ID:
         raise HTTPException(
             status_code=500,
@@ -587,6 +608,9 @@ def spotify_login():
 
     client_id = settings.SPOTIFY_CLIENT_ID.strip()
     redirect_uri = settings.SPOTIFY_REDIRECT_URI.strip()
+
+    state = secrets.token_urlsafe(32)
+    request.session["spotify_oauth_state"] = state
 
     params = {
         "client_id": client_id,
@@ -597,6 +621,7 @@ def spotify_login():
             "user-read-email "
             "user-read-recently-played"
         ),
+        "state": state,
     }
 
     url = (
@@ -617,6 +642,11 @@ async def spotify_callback(
     request: Request,
     db: Session = Depends(get_db),
 ):
+    state = request.query_params.get("state")
+    expected_state = request.session.pop("spotify_oauth_state", None)
+    if not state or not expected_state or not hmac.compare_digest(state, expected_state):
+        raise HTTPException(status_code=400, detail="Invalid Spotify OAuth state.")
+
     raw_code = request.query_params.get("code")
 
     if not raw_code:
@@ -630,7 +660,7 @@ async def spotify_callback(
         )
 
     code = raw_code.strip()
-    print(f"\n[Spotify Callback] Hit from client={request.client} for code={code[:15]}...", flush=True)
+    logger.info("[Spotify Callback] Processing OAuth authorization callback.")
 
     if (
         not settings.SPOTIFY_CLIENT_ID
@@ -675,7 +705,7 @@ async def spotify_callback(
             "redirect_uri": redirect_uri,
         }
 
-        print(f"[Spotify Token Exchange] Calling {token_url} with redirect_uri={redirect_uri}, client_id={client_id[:6]}...", flush=True)
+        logger.info("[Spotify Token Exchange] Calling token endpoint with redirect_uri=%s", redirect_uri)
 
         async with httpx.AsyncClient() as client:
             token_response = await client.post(
@@ -684,7 +714,7 @@ async def spotify_callback(
                 headers=headers,
             )
 
-        print(f"[Spotify Token Exchange] Response Status: {token_response.status_code}, Body: {token_response.text}", flush=True)
+        logger.info("[Spotify Token Exchange] Response Status: %d", token_response.status_code)
 
         if token_response.status_code != 200:
             raise HTTPException(
@@ -725,6 +755,7 @@ async def spotify_callback(
         spotify_user = profile_response.json()
 
         user_id = request.session.get("user_id")
+        user = None
 
         if user_id:
             user = (
@@ -732,11 +763,17 @@ async def spotify_callback(
                 .filter(User.id == int(user_id))
                 .first()
             )
-        else:
-            user = db.query(User).first()
-
+        if not user and spotify_user.get("email"):
+            user = (
+                db.query(User)
+                .filter(User.email == spotify_user.get("email").strip().lower())
+                .first()
+            )
         if not user:
-            user = User()
+            user = User(
+                email=spotify_user.get("email").strip().lower() if spotify_user.get("email") else None,
+                name=spotify_user.get("display_name"),
+            )
             db.add(user)
             db.commit()
             db.refresh(user)
@@ -891,4 +928,173 @@ async def refresh_all_tokens(
             results[conn.provider] = f"error: {str(exc)}"
 
     db.commit()
-    return {"status": "ok", "providers": results}
+    return {"status": "ok", "providers": results}
+
+
+# ---------------------------------------------------------
+# Privacy & Data Lifecycle Controls (Step 6)
+# ---------------------------------------------------------
+
+@router.delete("/connections/{provider}")
+def disconnect_provider(
+    provider: str,
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """
+    Disconnect a linked provider account and revoke/delete stored credentials.
+    """
+    from app.services.analysis_cache_service import delete_cached_analysis
+
+    provider_clean = provider.strip().lower()
+    # Normalize google / youtube naming
+    providers_to_match = [provider_clean]
+    if provider_clean in ("youtube", "google"):
+        providers_to_match.extend(["youtube", "google_data_portability"])
+
+    connections = (
+        db.query(Connection)
+        .filter(
+            Connection.user_id == user_id,
+            Connection.provider.in_(providers_to_match),
+        )
+        .all()
+    )
+
+    if not connections:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Provider '{provider}' is not connected.",
+        )
+
+    for conn in connections:
+        db.delete(conn)
+
+    db.commit()
+
+    # Clear relevant analysis caches
+    delete_cached_analysis(user_id=user_id, source=provider_clean)
+    delete_cached_analysis(user_id=user_id, source=None)
+
+    return {
+        "success": True,
+        "provider": provider_clean,
+        "message": f"Successfully disconnected {provider_clean}.",
+    }
+
+
+@router.get("/export")
+def export_user_data(
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """
+    Export all stored personal data for the authenticated user.
+    Excludes passwords, session secrets, encryption keys, and raw tokens.
+    """
+    from app.database.models import HistoryEvent, AnalysisResult, PortabilityExportJob
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    connections = db.query(Connection).filter(Connection.user_id == user_id).all()
+    events = (
+        db.query(HistoryEvent)
+        .filter(HistoryEvent.user_id == user_id)
+        .order_by(HistoryEvent.timestamp.asc())
+        .all()
+    )
+    analyses = db.query(AnalysisResult).filter(AnalysisResult.user_id == user_id).all()
+    export_jobs = db.query(PortabilityExportJob).filter(PortabilityExportJob.user_id == user_id).all()
+
+    import json
+    return {
+        "exported_at": datetime.utcnow().isoformat() + "Z",
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+        },
+        "connections": [
+            {
+                "provider": conn.provider,
+                "scope": conn.scope,
+                "created_at": conn.created_at.isoformat() if conn.created_at else None,
+                "expires_at": conn.expires_at.isoformat() if conn.expires_at else None,
+            }
+            for conn in connections
+        ],
+        "history_events_count": len(events),
+        "history_events": [
+            {
+                "id": ev.id,
+                "timestamp": ev.timestamp.isoformat() if ev.timestamp else None,
+                "source": ev.source,
+                "title": ev.title,
+                "artist": ev.artist,
+                "url": ev.url,
+                "duration": ev.duration,
+                "metadata": json.loads(ev.metadata_json) if ev.metadata_json else {},
+            }
+            for ev in events
+        ],
+        "analysis_records": [
+            {
+                "source": ar.source,
+                "event_count": ar.event_count,
+                "status": ar.status,
+                "analysis": json.loads(ar.analysis_json) if ar.analysis_json else {},
+                "created_at": ar.created_at.isoformat() if ar.created_at else None,
+                "updated_at": ar.updated_at.isoformat() if ar.updated_at else None,
+            }
+            for ar in analyses
+        ],
+        "export_jobs": [
+            {
+                "archive_job_id": job.archive_job_id,
+                "status": job.status,
+                "imported": job.imported,
+                "created_at": job.created_at.isoformat() if job.created_at else None,
+            }
+            for job in export_jobs
+        ],
+    }
+
+
+@router.delete("/account")
+def delete_user_account(
+    request: Request,
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """
+    Permanently delete the authenticated user's account and all associated personal data.
+    Cascades to connections, history events, analysis results, and export jobs.
+    Invalidates all caches and ends the user's session.
+    """
+    from app.services.analysis_cache_service import delete_cached_analysis
+    from app.database.models import HistoryEvent, AnalysisResult, PortabilityExportJob
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    # Explicit deletion in case DB engine does not enforce cascade (e.g. SQLite without PRAGMA foreign_keys=ON)
+    db.query(HistoryEvent).filter(HistoryEvent.user_id == user_id).delete(synchronize_session=False)
+    db.query(Connection).filter(Connection.user_id == user_id).delete(synchronize_session=False)
+    db.query(AnalysisResult).filter(AnalysisResult.user_id == user_id).delete(synchronize_session=False)
+    db.query(PortabilityExportJob).filter(PortabilityExportJob.user_id == user_id).delete(synchronize_session=False)
+    db.delete(user)
+    db.commit()
+
+    # Clear cache and session
+    delete_cached_analysis(user_id=user_id, source=None)
+    request.session.clear()
+
+    return {
+        "success": True,
+        "message": "Account and all associated personal data permanently deleted.",
+    }
+

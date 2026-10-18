@@ -12,6 +12,7 @@ Flow:
 """
 
 import base64
+import hmac
 import secrets
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
@@ -130,7 +131,7 @@ async def reddit_callback(
         return RedirectResponse(f"{frontend}/?reddit_error=no_code")
 
     expected_state = request.session.pop("reddit_oauth_state", None)
-    if expected_state and state != expected_state:
+    if not expected_state or not state or not hmac.compare_digest(state, expected_state):
         return RedirectResponse(f"{frontend}/?reddit_error=state_mismatch")
 
     user_id = request.session.get("user_id")

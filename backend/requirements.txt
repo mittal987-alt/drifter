@@ -1,17 +1,37 @@
-fastapi
-uvicorn
-python-dotenv
-httpx
-authlib
-sqlalchemy
-pydantic
-python-multipart
-itsdangerous
-numpy
-scikit-learn
-sentence-transformers
-hdbscan
-scipy
-umap-learn
-alembic
-websockets
+# ── Web framework ──────────────────────────────────────────
+fastapi>=0.115.0,<1.0.0
+uvicorn>=0.30.0,<1.0.0
+python-multipart>=0.0.9
+
+# ── Session middleware ─────────────────────────────────────
+itsdangerous>=2.2.0
+starlette>=0.38.0,<1.0.0
+
+# ── Authentication & OAuth ─────────────────────────────────
+authlib>=1.3.0
+httpx>=0.27.0
+
+# ── Configuration ──────────────────────────────────────────
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+
+# ── Database ───────────────────────────────────────────────
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+# Synchronous PostgreSQL driver — do NOT replace with asyncpg
+psycopg2-binary>=2.9.0
+
+# ── ML / AI ────────────────────────────────────────────────
+numpy>=1.26.0
+scikit-learn>=1.4.0
+sentence-transformers>=2.7.0
+hdbscan>=0.8.33
+scipy>=1.12.0
+umap-learn>=0.5.6
+
+# ── WebSockets ─────────────────────────────────────────────
+websockets>=12.0
+
+# ── Testing (development only) ─────────────────────────────
+# Install with: pip install -r requirements.txt -r requirements-dev.txt
+# Or add pytest here if you prefer a single file.

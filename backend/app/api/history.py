@@ -52,10 +52,10 @@ def save_history_events(
     if not events:
         return 0, 0
 
-    # Fetch all existing event hashes in the database to prevent constraint collisions
+    # Fetch existing event hashes for this user to prevent constraint collisions
     existing_hashes = {
         row[0]
-        for row in db.query(HistoryEvent.event_hash).all()
+        for row in db.query(HistoryEvent.event_hash).filter(HistoryEvent.user_id == user_id).all()
         if row[0]
     }
 
@@ -245,11 +245,17 @@ async def import_history(
 
     try:
         raw_bytes = await file.read()
-
     except Exception:
         raise HTTPException(
             status_code=400,
             detail="Could not read uploaded file.",
+        )
+
+    MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
+    if len(raw_bytes) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail="Uploaded file exceeds the maximum allowed limit of 50MB.",
         )
 
     if not raw_bytes:

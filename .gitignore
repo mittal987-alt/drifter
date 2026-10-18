@@ -33,12 +33,17 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Environment & Secrets
+# Environment & Secrets — never commit real credentials
 .env
 .env.*
 !.env.example
 backend/.env
+backend/.env.*
+!backend/.env.example
 frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
 
 # Chrome Extension / Browser Extension Packaging & Keys
 *.pem
