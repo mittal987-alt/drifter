@@ -3,7 +3,7 @@ import html
 import json
 import re
 import zipfile
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 from typing import Any
 
@@ -120,7 +120,7 @@ def parse_youtube_html(html_str: str) -> list[dict[str, Any]]:
             timestamp = parse_flexible_timestamp(date_str)
 
         if not timestamp:
-            timestamp = datetime.utcnow()
+            timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
 
         item: dict[str, Any] = {
             "title": raw_title,

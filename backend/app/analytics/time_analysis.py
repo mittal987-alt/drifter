@@ -1,59 +1,25 @@
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import numpy as np
 from scipy.spatial.distance import jensenshannon
+
+from app.analytics.topics import normalize_topic_name  # Fix #4: moved from mid-file
+from app.reports.utils import parse_ts
 
 
 # ============================================================
 # HELPERS
 # ============================================================
 
-def parse_timestamp(timestamp: Any) -> datetime:
+def get_month(timestamp: Any) -> str | None:
     """
-    Convert timestamp into a datetime object.
-
-    Supports:
-    - datetime
-    - ISO timestamp string
-    - Unix epoch (seconds or milliseconds)
-    - Common date/time strings
+    Convert timestamp to YYYY-MM string, or None if unparseable.
     """
-    if isinstance(timestamp, datetime):
-        return timestamp
-
-    if isinstance(timestamp, (int, float)):
-        if timestamp > 1e11:
-            return datetime.utcfromtimestamp(timestamp / 1000.0)
-        return datetime.utcfromtimestamp(timestamp)
-
-    if isinstance(timestamp, str):
-        cleaned = timestamp.replace("Z", "+00:00").replace("/", "-").strip()
-        try:
-            return datetime.fromisoformat(cleaned)
-        except Exception:
-            pass
-        for fmt in (
-            "%Y-%m-%d %H:%M:%S",
-            "%Y-%m-%d %H:%M",
-            "%Y-%m-%d",
-            "%d-%m-%Y %H:%M:%S",
-            "%d-%m-%Y",
-        ):
-            try:
-                return datetime.strptime(cleaned.split("+")[0].strip(), fmt)
-            except Exception:
-                continue
-
-    return datetime.utcnow()
-
-
-def get_month(timestamp: Any) -> str:
-    """
-    Convert timestamp to YYYY-MM.
-    """
-    dt = parse_timestamp(timestamp)
+    dt = parse_ts(timestamp)
+    if dt is None:
+        return None  # Fix #1+2: guard instead of silently defaulting to utcnow()
     return dt.strftime("%Y-%m")
 
 
@@ -63,12 +29,14 @@ def get_month(timestamp: Any) -> str:
 
 def group_by_month(assignments: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
     """
-    Group assignment records by month.
+    Group assignment records by month, skipping events with unparseable timestamps.
     """
-    monthly = defaultdict(list)
+    monthly: defaultdict[str, list] = defaultdict(list)
 
     for item in assignments:
         month = get_month(item.get("timestamp"))
+        if month is None:  # Fix #1+2: skip instead of silently grouping under today
+            continue
         monthly[month].append(item)
 
     return dict(sorted(monthly.items()))
@@ -77,8 +45,6 @@ def group_by_month(assignments: list[dict[str, Any]]) -> dict[str, list[dict[str
 # ============================================================
 # MONTHLY TOPIC COUNTS
 # ============================================================
-
-from app.analytics.topics import normalize_topic_name
 
 def calculate_monthly_topic_counts(assignments: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
     """
@@ -160,9 +126,14 @@ def calculate_drift_score(
         dtype=float,
     )
 
+    # Fix #6: skip distributions that are all-zero before adding epsilon — they should
+    # not contribute a spurious non-zero distance against valid distributions.
+    if previous.sum() == 0 or current.sum() == 0:
+        return 0.0
+
     epsilon = 1e-10
-    previous += epsilon
-    current += epsilon
+    previous = previous + epsilon
+    current = current + epsilon
 
     previous /= previous.sum()
     current /= current.sum()
@@ -279,7 +250,8 @@ def calculate_topic_momentum(
         try:
             sorted_events = sorted(
                 assignments,
-                key=lambda x: parse_timestamp(x.get("timestamp"))
+                # Fix #5: None-safe sort key
+                key=lambda x: parse_ts(x.get("timestamp")) or datetime.min
             )
         except Exception:
             sorted_events = assignments

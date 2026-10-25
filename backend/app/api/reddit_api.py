@@ -13,8 +13,9 @@ Flow:
 
 import base64
 import hmac
+import logging
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
 import httpx
@@ -28,6 +29,8 @@ from app.database.database import get_db, SessionLocal
 from app.database.models import Connection
 from app.services.reddit_service import sync_reddit_user_history
 from app.services.analysis_runner import run_user_analysis
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -45,12 +48,12 @@ USER_AGENT = "Drifter/1.0"
 async def _ensure_valid_token(conn: Connection, db: Session) -> str:
     if (
         conn.expires_at
-        and conn.expires_at <= datetime.utcnow() + timedelta(seconds=60)
+        and conn.expires_at <= datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=60)
         and conn.refresh_token
     ):
         tokens = await _refresh_reddit_token(conn.refresh_token)
         conn.access_token = tokens["access_token"]
-        conn.expires_at = datetime.utcnow() + timedelta(seconds=tokens.get("expires_in", 3600))
+        conn.expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=tokens.get("expires_in", 3600))
         db.commit()
     return conn.access_token
 
@@ -118,6 +121,7 @@ def reddit_login(request: Request):
 @router.get("/callback")
 async def reddit_callback(
     request: Request,
+    background_tasks: BackgroundTasks,
     code: str | None = None,
     state: str | None = None,
     error: str | None = None,
@@ -175,18 +179,18 @@ async def reddit_callback(
         if conn:
             conn.access_token = access_token
             conn.refresh_token = refresh_token or conn.refresh_token
-            conn.expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+            conn.expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=expires_in)
             conn.scope = token_data.get("scope", REDDIT_SCOPES)
-            conn.created_at = datetime.utcnow()
+            conn.created_at = datetime.now(timezone.utc).replace(tzinfo=None)
         else:
             conn = Connection(
                 user_id=user_id,
                 provider="reddit",
                 access_token=access_token,
                 refresh_token=refresh_token,
-                expires_at=datetime.utcnow() + timedelta(seconds=expires_in),
+                expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=expires_in),
                 scope=token_data.get("scope", REDDIT_SCOPES),
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc).replace(tzinfo=None),
             )
             db.add(conn)
         db.commit()
@@ -194,8 +198,7 @@ async def reddit_callback(
         db.close()
 
     # Background sync
-    import asyncio
-    asyncio.create_task(_background_sync(user_id, access_token))
+    background_tasks.add_task(_background_sync, user_id, access_token)
 
     return RedirectResponse(f"{frontend}/?reddit_connected=1")
 
@@ -207,7 +210,7 @@ async def _background_sync(user_id: int, access_token: str):
         run_user_analysis(user_id=user_id, source="reddit")
         run_user_analysis(user_id=user_id, source=None)
     except Exception as exc:
-        print(f"[REDDIT BACKGROUND SYNC ERROR] user={user_id}: {exc}", flush=True)
+        logger.error("[REDDIT BACKGROUND SYNC ERROR] user=%s: %s", user_id, exc, exc_info=True)
     finally:
         db.close()
 

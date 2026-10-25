@@ -50,17 +50,28 @@ async function getStorageData() {
   })
 }
 
+let isFlushing = false;
+
+function safeDateString(val) {
+  try {
+    const d = new Date(val || Date.now());
+    return isNaN(d.getTime()) ? new Date().toISOString().split("T")[0] : d.toISOString().split("T")[0];
+  } catch (e) {
+    return new Date().toISOString().split("T")[0];
+  }
+}
+
 async function handleIncomingWatchEvent(event) {
   if (!event || (!event.title && !event.videoId)) return;
 
   const data = await getStorageData();
   const queue = data.watchQueue;
 
-  const todayStr = new Date(event.watchedAt || Date.now()).toISOString().split("T")[0];
+  const todayStr = safeDateString(event.watchedAt);
 
   // Deduplicate properly per platform
   const existingIdx = queue.findIndex((q) => {
-    const qDate = new Date(q.watchedAt || Date.now()).toISOString().split("T")[0];
+    const qDate = safeDateString(q.watchedAt);
     if (qDate !== todayStr) return false;
 
     // YouTube: match videoId
@@ -95,36 +106,41 @@ async function handleIncomingWatchEvent(event) {
 }
 
 async function flushQueueToBackend() {
-  const data = await getStorageData();
-  const queue = data.watchQueue;
-
-  if (queue.length === 0) {
-    return { success: true, count: 0, message: "Queue is empty" };
+  if (isFlushing) {
+    return { success: false, inFlight: true, message: "Sync already in progress" };
   }
-
-  const backendUrl = data.backendUrl.replace(/\/$/, "");
-  const syncToken = data.syncToken;
-
-  if (!syncToken) {
-    console.warn("[Drifter Sync] Sync skipped: No sync token configured.");
-    await chrome.storage.local.set({
-      lastSyncStatus: "FAILED",
-      lastSyncError: "No sync token configured. Open extension settings and paste your Drifter token.",
-    });
-    return {
-      success: false,
-      error: "No sync token configured. Please paste your token from the Drifter dashboard into extension settings.",
-    };
-  }
-
-  const endpoint = `${backendUrl}/api/youtube-history`;
-
-  const headers = {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${syncToken}`,
-  };
+  isFlushing = true;
 
   try {
+    const data = await getStorageData();
+    const queue = data.watchQueue;
+
+    if (queue.length === 0) {
+      return { success: true, count: 0, message: "Queue is empty" };
+    }
+
+    const backendUrl = data.backendUrl.replace(/\/$/, "");
+    const syncToken = data.syncToken;
+
+    if (!syncToken) {
+      console.warn("[Drifter Sync] Sync skipped: No sync token configured.");
+      await chrome.storage.local.set({
+        lastSyncStatus: "FAILED",
+        lastSyncError: "No sync token configured. Open extension settings and paste your Drifter token.",
+      });
+      return {
+        success: false,
+        error: "No sync token configured. Please paste your token from the Drifter dashboard into extension settings.",
+      };
+    }
+
+    const endpoint = `${backendUrl}/api/youtube-history`;
+
+    const headers = {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${syncToken}`,
+    };
+
     const response = await fetch(endpoint, {
       method: "POST",
       headers,
@@ -142,9 +158,13 @@ async function flushQueueToBackend() {
     const result = await response.json();
     console.log("[Drifter Sync] Sync successful:", result);
 
+    // Atomically retain any events queued while the network request was in flight
+    const currentData = await getStorageData();
+    const remainingQueue = currentData.watchQueue.slice(queue.length);
+
     const now = new Date().toISOString();
     await chrome.storage.local.set({
-      watchQueue: [],
+      watchQueue: remainingQueue,
       lastSyncTime: now,
       lastSyncStatus: "SUCCESS",
       lastSyncError: null,
@@ -164,5 +184,7 @@ async function flushQueueToBackend() {
       lastSyncError: error.message,
     });
     return { success: false, error: error.message };
+  } finally {
+    isFlushing = false;
   }
 }

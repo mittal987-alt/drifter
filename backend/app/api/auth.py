@@ -1,8 +1,9 @@
 import asyncio
 import base64
+import logging
 import os
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 from urllib.parse import urlencode
@@ -27,6 +28,8 @@ from app.services.spotify_service import (
     sync_spotify_user_history,
     refresh_spotify_token,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -137,8 +140,6 @@ def register(
     payload: RegisterRequest,
     request: Request,
     db: Session = Depends(get_db),
-):
-    from sqlalchemy import text as sql_text
     email = payload.email.strip().lower()
     if not email or "@" not in email or "." not in email:
         raise HTTPException(status_code=400, detail="Invalid email address.")
@@ -161,7 +162,7 @@ def register(
         try:
             guest_user = (
                 db.query(User)
-                .filter(User.id == int(session_user_id), User.email == None, User.password_hash == None)  # noqa: E711
+                .filter(User.id == int(session_user_id), User.email.is_(None), User.password_hash.is_(None))
                 .first()
             )
         except Exception:
@@ -364,7 +365,7 @@ async def google_data_portability_callback(
 
     expires_at = None
     if token_data.get("expires_in"):
-        expires_at = datetime.utcnow() + timedelta(seconds=int(token_data["expires_in"]))
+        expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=int(token_data["expires_in"]))
 
     connection = (
         db.query(Connection)
@@ -547,7 +548,7 @@ async def google_callback(
         expires_at = None
 
         if expires_in:
-            expires_at = datetime.utcnow() + timedelta(
+            expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
                 seconds=int(expires_in)
             )
 
@@ -629,7 +630,7 @@ def spotify_login(request: Request):
         + urlencode(params)
     )
 
-    print(f"\n[Spotify Login] Redirecting to Spotify authorize with redirect_uri: {redirect_uri}", flush=True)
+    logger.info("[Spotify Login] Redirecting to Spotify authorize with redirect_uri: %s", redirect_uri)
     return RedirectResponse(url)
 
 
@@ -652,7 +653,7 @@ async def spotify_callback(
     if not raw_code:
         error_param = request.query_params.get("error")
         if error_param:
-            print(f"[Spotify Callback Error] Spotify returned error query param: {error_param}", flush=True)
+            logger.warning("[Spotify Callback Error] Spotify returned error query param: %s", error_param)
             raise HTTPException(status_code=400, detail=f"Spotify error: {error_param}")
         raise HTTPException(
             status_code=400,
@@ -682,7 +683,7 @@ async def spotify_callback(
 
     async with code_lock:
         if code in _processed_spotify_codes:
-            print(f"[Spotify Callback] Code {code[:15]}... already processed successfully! Returning cached redirect.", flush=True)
+            logger.info("[Spotify Callback] Code %s... already processed successfully! Returning cached redirect.", code[:15])
             return _processed_spotify_codes[code]
 
         token_url = "https://accounts.spotify.com/api/token"
@@ -745,7 +746,7 @@ async def spotify_callback(
 
         if profile_response.status_code != 200:
             if profile_response.status_code == 403 and "premium" in profile_response.text.lower():
-                print("[Spotify Profile] Spotify Premium required for direct sync. Redirecting to frontend with guidance.", flush=True)
+                logger.info("[Spotify Profile] Spotify Premium required for direct sync. Redirecting to frontend with guidance.")
                 return RedirectResponse(f"{settings.FRONTEND_URL}/?spotify_error=premium_required")
             raise HTTPException(
                 status_code=400,
@@ -781,7 +782,7 @@ async def spotify_callback(
         expires_at = None
 
         if expires_in:
-            expires_at = datetime.utcnow() + timedelta(
+            expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
                 seconds=int(expires_in)
             )
 
@@ -824,7 +825,7 @@ async def spotify_callback(
         try:
             await sync_spotify_user_history(db=db, user_id=user.id, access_token=access_token)
         except Exception as exc:
-            print(f"[Spotify History Sync Warning]: {exc}", flush=True)
+            logger.warning("[Spotify History Sync Warning]: %s", exc)
 
         request.session["user_id"] = user.id
 
@@ -901,7 +902,7 @@ async def refresh_all_tokens(
     for conn in connections:
         needs_refresh = (
             conn.expires_at is not None
-            and conn.expires_at <= datetime.utcnow() + timedelta(minutes=10)
+            and conn.expires_at <= datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=10)
             and conn.refresh_token is not None
         )
 
@@ -913,14 +914,14 @@ async def refresh_all_tokens(
             if conn.provider == "spotify":
                 tokens = await refresh_spotify_token(conn.refresh_token)
                 conn.access_token = tokens["access_token"]
-                conn.expires_at = datetime.utcnow() + timedelta(seconds=tokens.get("expires_in", 3600))
+                conn.expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=tokens.get("expires_in", 3600))
                 if tokens.get("refresh_token"):
                     conn.refresh_token = tokens["refresh_token"]
                 results[conn.provider] = "refreshed"
             elif conn.provider in ("youtube", "google"):
                 tokens = await refresh_google_token(conn.refresh_token)
                 conn.access_token = tokens["access_token"]
-                conn.expires_at = datetime.utcnow() + timedelta(seconds=tokens.get("expires_in", 3600))
+                conn.expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=tokens.get("expires_in", 3600))
                 results[conn.provider] = "refreshed"
             else:
                 results[conn.provider] = "skipped"
@@ -1010,7 +1011,7 @@ def export_user_data(
 
     import json
     return {
-        "exported_at": datetime.utcnow().isoformat() + "Z",
+        "exported_at": datetime.now(timezone.utc).isoformat(),
         "user": {
             "id": user.id,
             "email": user.email,

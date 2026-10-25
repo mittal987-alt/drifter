@@ -89,16 +89,22 @@ def save_analysis(
 
             result.analysis_json = analysis_json
 
+            result.status = "READY"
+
+            result.error = None
+
         else:
 
             result = AnalysisResult(
                 user_id=user_id,
                 source=source,
                 event_count=event_count,
+                status="READY",
                 analysis_json=analysis_json,
             )
 
             db.add(result)
+
 
         db.commit()
 

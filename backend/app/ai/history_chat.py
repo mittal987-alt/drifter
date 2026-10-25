@@ -4,6 +4,8 @@ import os
 import re
 from typing import Any
 
+from app.reports.utils import parse_ts as _parse_timestamp
+
 
 KNOWN_SOURCES = {"youtube", "spotify", "github", "reddit", "netflix", "steam", "twitter", "web", "chrome", "extension"}
 
@@ -39,33 +41,6 @@ def _extract_sources(events: list[dict[str, Any]]) -> list[str]:
             seen_set.add(norm)
             seen.append(norm)
     return seen
-
-
-def _parse_timestamp(ts: Any) -> datetime | None:
-    if isinstance(ts, datetime):
-        return ts
-    if isinstance(ts, (int, float)):
-        if ts > 1e11:
-            return datetime.utcfromtimestamp(ts / 1000.0)
-        return datetime.utcfromtimestamp(ts)
-    if isinstance(ts, str):
-        cleaned = ts.replace("Z", "+00:00").replace("/", "-").strip()
-        try:
-            return datetime.fromisoformat(cleaned).replace(tzinfo=None)
-        except Exception:
-            pass
-        for fmt in (
-            "%Y-%m-%d %H:%M:%S",
-            "%Y-%m-%d %H:%M",
-            "%Y-%m-%d",
-            "%d-%m-%Y %H:%M:%S",
-            "%d-%m-%Y",
-        ):
-            try:
-                return datetime.strptime(cleaned.split("+")[0].strip(), fmt)
-            except Exception:
-                continue
-    return None
 
 
 def answer_history_chat(
@@ -203,7 +178,8 @@ def _call_external_llm(
                     }
 
     if gemini_key:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+        gemini_model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={gemini_key}"
         payload = {
             "contents": [
                 {"role": "user", "parts": [{"text": context_prompt + "\n\nUser Question: " + question}]}

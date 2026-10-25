@@ -104,6 +104,15 @@ document.addEventListener("DOMContentLoaded", () => {
       syncBtn.disabled = false;
       syncBtn.textContent = "Sync Now";
 
+      if (chrome.runtime.lastError) {
+        showMessage(
+          chrome.runtime.lastError.message || "Failed to communicate with extension background worker.",
+          true
+        );
+        loadState();
+        return;
+      }
+
       if (response && response.success) {
         showMessage(
           `Synced ${response.count || 0} events successfully!`

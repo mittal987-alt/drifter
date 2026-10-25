@@ -3,7 +3,7 @@ import csv
 import io
 import json
 import zipfile
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 from typing import Any
 
@@ -109,7 +109,7 @@ def normalize_spotify_event(item: dict):
     )
 
     if not timestamp:
-        timestamp = datetime.utcnow()
+        timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
 
     # Artist extraction
     artist = (
@@ -185,7 +185,7 @@ def normalize_github_event(item: dict):
         or item.get("updated_at")
     )
     if not timestamp:
-        timestamp = datetime.utcnow()
+        timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
 
     title = (
         item.get("full_name")
@@ -230,7 +230,7 @@ def normalize_netflix_event(item: dict):
         or item.get("startTime")
     )
     if not timestamp:
-        timestamp = datetime.utcnow()
+        timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
 
     title = (
         item.get("Title")
@@ -268,7 +268,7 @@ def normalize_reddit_event(item: dict):
         or item.get("timestamp")
     )
     if not timestamp:
-        timestamp = datetime.utcnow()
+        timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
 
     title = (
         item.get("title")
@@ -310,7 +310,7 @@ def normalize_steam_event(item: dict):
         or item.get("timestamp")
     )
     if not timestamp:
-        timestamp = datetime.utcnow()
+        timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
 
     title = item.get("name") or item.get("title") or ""
     if not title:
@@ -344,7 +344,7 @@ def normalize_browser_event(item: dict):
         or item.get("time")
     )
     if not timestamp:
-        timestamp = datetime.utcnow()
+        timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
 
     title = item.get("title") or item.get("url") or ""
     if not title:
@@ -407,7 +407,7 @@ def normalize_twitter_event(item: dict):
         or tweet_data.get("time")
     )
     if not timestamp:
-        timestamp = datetime.utcnow()
+        timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
 
     return {
         "timestamp": timestamp,
@@ -459,7 +459,7 @@ def normalize_event(
     if not title:
         return None
     return {
-        "timestamp": parse_timestamp(item.get("timestamp") or item.get("date") or item.get("time")) or datetime.utcnow(),
+        "timestamp": parse_timestamp(item.get("timestamp") or item.get("date") or item.get("time")) or datetime.now(timezone.utc).replace(tzinfo=None),
         "source": src,
         "title": str(title),
         "artist": item.get("artist") or item.get("author"),
@@ -641,15 +641,13 @@ def parse_youtube_history(data: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if not raw_time:
             continue
 
-        try:
-            timestamp = datetime.fromisoformat(
-                raw_time.replace("Z", "+00:00")
-            )
-        except (ValueError, TypeError):
+        timestamp = parse_timestamp(raw_time)
+        if not timestamp:
             continue
 
-        # YouTube URL
+        # YouTube URL and artist/channel
         url = None
+        artist = None
 
         subtitles = item.get("subtitles")
 
@@ -658,6 +656,7 @@ def parse_youtube_history(data: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
             if isinstance(first_subtitle, dict):
                 url = first_subtitle.get("url")
+                artist = first_subtitle.get("name")
 
         # Remove "Watched " prefix
         clean_title = title
@@ -669,7 +668,7 @@ def parse_youtube_history(data: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "timestamp": timestamp,
             "source": "youtube",
             "title": clean_title,
-            "artist": None,
+            "artist": artist,
             "url": url,
             "duration": None,
             "metadata": {

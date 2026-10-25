@@ -1,19 +1,10 @@
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 import math
 from typing import Any
 
-
-def _parse_ts(ts: Any) -> datetime | None:
-    if isinstance(ts, datetime):
-        return ts
-    if isinstance(ts, str):
-        try:
-            return datetime.fromisoformat(ts.replace("Z", "+00:00")).replace(tzinfo=None)
-        except Exception:
-            return None
-    return None
+from app.reports.utils import parse_ts
 
 
 def generate_interest_dna(
@@ -35,6 +26,12 @@ def generate_interest_dna(
                 "drift_velocity": 50,
                 "deep_dive_index": 50,
                 "nocturnal_quotient": 50,
+            },
+            "traits": {
+                "superpower": "Boundless potential awaiting first observations.",
+                "vulnerability": "Insufficient data to infer focus architecture.",
+                "peak_hours": "Unmapped",
+                "complementary": "Any",
             },
             "primary_markers": ["Exploration", "Curiosity", "Discovery"],
             "palette": ["#75d6c2", "#a7b8ff", "#f2b56b"],
@@ -68,7 +65,7 @@ def generate_interest_dna(
     # 4. Nocturnal Quotient
     night_events = 0
     for e in assignments:
-        ts = _parse_ts(e.get("timestamp"))
+        ts = parse_ts(e.get("timestamp"))
         if ts and (ts.hour >= 23 or ts.hour < 5):
             night_events += 1
     nocturnal_score = min(98, max(15, int((night_events / max(total, 1)) * 250 + 15)))
@@ -148,5 +145,5 @@ def generate_interest_dna(
         "traits": traits,
         "primary_markers": top_markers,
         "palette": ["#f2b56b", "#75d6c2", "#a7b8ff"],
-        "generated_at": datetime.utcnow().strftime("%Y.%m.%d"),
+        "generated_at": datetime.now(timezone.utc).strftime("%Y.%m.%d"),
     }

@@ -1,0 +1,83 @@
+[tool.ruff]
+# Target Python 3.12 (matches the venv)
+target-version = "py312"
+line-length = 100
+
+# Which directories to include
+include = ["app/**/*.py", "tests/**/*.py"]
+
+# Which paths to exclude
+exclude = [
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    "venv",
+    "migrations",
+    "data",
+]
+
+[tool.ruff.lint]
+# Core rule sets:
+#   E  = pycodestyle errors
+#   F  = pyflakes (unused imports, undefined names)
+#   I  = isort (import ordering)
+#   W  = pycodestyle warnings
+#   UP = pyupgrade (modern Python idioms)
+#   S  = bandit (security checks) — applied selectively
+#   B  = flake8-bugbear
+select = ["E", "F", "I", "W", "UP", "B"]
+
+# Intentionally ignored rules:
+#   E501  = line too long (handled by formatter)
+#   E711  = comparison to None (SQLAlchemy uses `is None` pattern)
+#   E712  = comparison to True/False (common in SQLAlchemy filters)
+#   B008  = do not perform function calls in default arguments
+#           (FastAPI's Depends() pattern requires this)
+#   F401  = imported but unused (some imports are for side effects)
+#   UP007 = Use X | Y for type hints (keep Optional[] for SQLAlchemy compat)
+ignore = ["E501", "E711", "E712", "B008", "F401", "UP007"]
+
+# Rules that are errors in tests but warnings elsewhere
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "S101",   # use of assert (fine in tests)
+    "S106",   # hardcoded password (test fixtures use known secrets)
+    "S108",   # probable insecure temporary file usage
+]
+
+[tool.ruff.format]
+# Black-compatible formatting
+quote-style = "double"
+indent-style = "space"
+magic-trailing-comma = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "app/database/migrations/*",
+    "venv/*",
+    "tests/*",
+]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if TYPE_CHECKING",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

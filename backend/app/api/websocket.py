@@ -150,12 +150,12 @@ def _resolve_ws_user_id(websocket: WebSocket) -> Optional[int]:
 
         # Fallback to URLSafeTimedSerializer if encoded differently
         try:
-            from itsdangerous import URLSafeTimedSerializer
             data = URLSafeTimedSerializer(settings.SESSION_SECRET).loads(session_cookie)
             if isinstance(data, dict) and data.get("user_id"):
                 return _verify_user_in_db(int(data["user_id"]))
         except Exception:
             pass
+
 
     return None
 

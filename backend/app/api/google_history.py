@@ -1,17 +1,15 @@
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user_id
 from app.api.history import save_youtube_events
-from app.config import settings
 from app.database.database import get_db
 from app.database.models import Connection, PortabilityExportJob
 from app.services.google_service import (
-    GOOGLE_DATA_PORTABILITY_YOUTUBE_SCOPE,
     download_portability_archive,
     get_youtube_history_export_state,
     initiate_youtube_history_export,
@@ -25,7 +23,7 @@ router = APIRouter(prefix="/api/history/google", tags=["Google History"])
 
 
 def _connection_token(connection: Connection):
-    if connection.expires_at and connection.expires_at <= datetime.utcnow():
+    if connection.expires_at and connection.expires_at <= datetime.now(timezone.utc).replace(tzinfo=None):
         return None
     return connection.access_token
 
@@ -43,7 +41,7 @@ async def _get_portability_token(
     token_data = await refresh_google_token(connection.refresh_token)
     connection.access_token = token_data["access_token"]
     if token_data.get("expires_in"):
-        connection.expires_at = datetime.utcnow() + timedelta(
+        connection.expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
             seconds=int(token_data["expires_in"])
         )
     db.commit()

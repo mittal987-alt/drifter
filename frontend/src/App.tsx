@@ -69,7 +69,7 @@ import {
   getHistory,
   getLatestGoogleExportStatus,
 } from "./services/history";
-import type { HistoryEvent } from "./services/history";
+import type { HistoryEvent, HistorySource } from "./services/history";
 import { syncSpotifyHistory } from "./services/spotify";
 
 import InterestMap from "./components/InterestMap";
@@ -160,7 +160,7 @@ function App() {
     useState(false);
 
   const [importSource, setImportSource] =
-    useState<"youtube" | "spotify" | "github" | "steam" | "twitter" | "browser">("youtube");
+    useState<HistorySource>("youtube");
 
   const [importFile, setImportFile] =
     useState<File | null>(null);
@@ -506,9 +506,12 @@ function App() {
                 {importSource === "spotify" && "Upload your Spotify listening history JSON or CSV from Privacy Settings."}
                 {importSource === "youtube" && "Upload your YouTube watch history JSON or Google Takeout ZIP."}
                 {importSource === "github" && "Upload your GitHub starred repositories or events JSON."}
+                {importSource === "reddit" && "Upload your Reddit account data export (saved, comments, upvoted JSON/CSV)."}
+                {importSource === "netflix" && "Upload your Netflix viewing history CSV (ViewingActivity.csv)."}
                 {importSource === "steam" && "Upload your Steam games/playtime JSON export."}
                 {importSource === "twitter" && "Upload your Twitter/X archive tweets.js or JSON export."}
                 {importSource === "browser" && "Upload your Chrome/Firefox browsing history JSON or CSV."}
+                {importSource === "other" && "Upload any custom history or attention log in JSON or CSV format."}
               </p>
             </div>
 
@@ -528,14 +531,17 @@ function App() {
                 Select Platform Source
               </p>
 
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {[
                   { id: "youtube", label: "YouTube", sub: "Watch history" },
                   { id: "spotify", label: "Spotify", sub: "Audio & Music" },
                   { id: "github", label: "GitHub", sub: "Code & Repos" },
+                  { id: "reddit", label: "Reddit", sub: "Posts & Saved" },
+                  { id: "netflix", label: "Netflix", sub: "Viewing Activity" },
                   { id: "steam", label: "Steam", sub: "Games & Playtime" },
                   { id: "twitter", label: "X / Twitter", sub: "Tweets & Threads" },
                   { id: "browser", label: "Browser", sub: "Web History" },
+                  { id: "other", label: "Other", sub: "Custom JSON/CSV" },
                 ].map((item) => {
                   const isSelected = importSource === item.id;
                   return (
@@ -2317,7 +2323,7 @@ function App() {
 
               {activeView === "prediction" && (
                 <ErrorBoundary fallbackTitle="Prediction view failed to load">
-                  <PredictionWorkspaceView source={importSource} />
+                  <PredictionWorkspaceView />
                 </ErrorBoundary>
               )}
 
@@ -2329,13 +2335,13 @@ function App() {
 
               {activeView === "dna" && (
                 <ErrorBoundary fallbackTitle="Interest DNA view failed to load">
-                  <DnaWorkspaceView source={importSource} />
+                  <DnaWorkspaceView />
                 </ErrorBoundary>
               )}
 
               {activeView === "nexus" && (
                 <ErrorBoundary fallbackTitle="Curiosity Nexus view failed to load">
-                  <NexusWorkspaceView source={importSource} />
+                  <NexusWorkspaceView />
                 </ErrorBoundary>
               )}
 
@@ -2351,7 +2357,6 @@ function App() {
             onClose={() =>
               setChatOpen(false)
             }
-            source={importSource}
           />
 
           <YearInDriftModal
@@ -2359,7 +2364,6 @@ function App() {
             onClose={() =>
               setWrappedOpen(false)
             }
-            source={importSource}
           />
 
           <ExtensionSyncModal

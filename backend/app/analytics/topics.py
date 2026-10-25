@@ -18,12 +18,13 @@ EXTRA_STOP_WORDS = {
     "null", "fb", "fbigs", "dv1", "alt", "bundle", "p3", "431", "1a", "1b", "784", "m0",
     "shorts", "reva", "ch", "version", "ep", "episode", "season", "part", "vol",
     "karo", "hai", "ka", "ki", "ke", "ko", "se", "aur", "ye", "wo", "trailer",
-    "teaser", "music", "song", "lyric", "lyrics", "status", "video"
+    "teaser", "music", "song", "lyric", "lyrics", "status",
+    # Fix #7: removed duplicate "video" (was present on both L16 and L21)
 }
 
-ALL_STOP_WORDS = list(ENGLISH_STOP_WORDS.union(EXTRA_STOP_WORDS))
+# Fix #7: frozenset for O(1) `in` membership tests (was list — O(n))
+ALL_STOP_WORDS: frozenset[str] = frozenset(ENGLISH_STOP_WORDS) | EXTRA_STOP_WORDS
 
-# Smart category mappings for clean human-readable titles
 # Smart category mappings for clean human-readable titles
 CATEGORY_MAPPINGS = [
     (re.compile(r"\b(meet\.google|google meet|meet|zoom|teams|webex|conference call|meeting)\b", re.I), "Google Meet"),
@@ -97,16 +98,15 @@ def classify_single_event(title: str, artist: str | None = None) -> str:
     if not combined:
         return "Other"
 
-    # 1. Match category rules
+    # 1. Match category rules (includes Google Meet via CATEGORY_MAPPINGS[0])
     for pattern, cat_name in CATEGORY_MAPPINGS:
         if pattern.search(combined):
             return cat_name
 
-    # 2. Check for Google Meet titles
-    if re.search(r"\b(meet|google meet)\b", combined, re.I) or re.search(r"^\s*meet\b", combined, re.I):
-        return "Google Meet"
+    # Fix #4: removed redundant Google Meet re.search block — already covered by
+    # CATEGORY_MAPPINGS[0] which matches "meet", "google meet", etc.
 
-    # 3. Extract clean coherent title phrase
+    # 2. Extract clean coherent title phrase
     clean = clean_title_for_topic(title)
     if clean and len(clean) >= 3 and clean.lower() not in ("other", "video", "watched", "null"):
         return clean
@@ -150,12 +150,14 @@ def _call_llm_for_cluster_label(representative_titles: list[str]) -> str | None:
                 resp = client.post(url, json=payload)
                 if resp.status_code == 200:
                     candidate = resp.json().get("response", "").strip()
-                    clean = re.sub(r'["\'.]', '', candidate).strip()
+                    # Fix #2: replace newlines before split so multi-line responses don't pass word-count check
+                    clean = re.sub(r'["\'.\n\r]', ' ', candidate).strip()
                     if clean and 2 <= len(clean.split()) <= 5 and "error" not in clean.lower():
                         return clean.title()
 
         if gemini_key:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+            gemini_model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")  # Fix #6
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={gemini_key}"
             payload = {
                 "contents": [{"role": "user", "parts": [{"text": prompt}]}]
             }
@@ -164,7 +166,8 @@ def _call_llm_for_cluster_label(representative_titles: list[str]) -> str | None:
                 if resp.status_code == 200:
                     data = resp.json()
                     candidate = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                    clean = re.sub(r'["\'.]', '', candidate).strip()
+                    # Fix #2: strip newlines before word-count check
+                    clean = re.sub(r'["\'.\n\r]', ' ', candidate).strip()
                     if clean and 2 <= len(clean.split()) <= 5 and "error" not in clean.lower():
                         return clean.title()
 
@@ -184,7 +187,8 @@ def _call_llm_for_cluster_label(representative_titles: list[str]) -> str | None:
                 if resp.status_code == 200:
                     data = resp.json()
                     candidate = data["choices"][0]["message"]["content"].strip()
-                    clean = re.sub(r'["\'.]', '', candidate).strip()
+                    # Fix #2: strip newlines before word-count check
+                    clean = re.sub(r'["\'.\n\r]', ' ', candidate).strip()
                     if clean and 2 <= len(clean.split()) <= 5 and "error" not in clean.lower():
                         return clean.title()
 
@@ -282,23 +286,27 @@ def generate_topic_labels(
 
         if matched_cat:
             labels[cluster_id] = matched_cat
-            print(f"[Topic Labels] Cluster {cluster_id} -> '{matched_cat}' (Category Rule Match)")
+            # Fix #1: replaced print() with logger.debug()
+            logger.debug("[Topic Labels] Cluster %d -> '%s' (Category Rule Match)", cluster_id, matched_cat)
             continue
 
         # ------------------------------------------------------------
         # 2. Compute Centroid & Rank Member Titles by Cosine Similarity
         # ------------------------------------------------------------
         if embeddings is not None and len(embeddings) == len(texts):
-            member_embeddings = embeddings[cluster_member_indices]
-            centroid = np.mean(member_embeddings, axis=0)
-            norm = np.linalg.norm(centroid)
-            if norm > 0:
-                centroid = centroid / norm
-
-            # Dot product gives cosine similarity since member embeddings are L2 normalized
-            similarities = np.dot(member_embeddings, centroid)
-            ranked_local_indices = np.argsort(similarities)[::-1]
-            representative_titles = [cluster_texts[i] for i in ranked_local_indices[:8]]
+            # Fix #5: guard against out-of-bounds indices if texts/embeddings are misaligned
+            valid_indices = [i for i in cluster_member_indices if i < len(embeddings)]
+            if valid_indices:
+                member_embeddings = embeddings[valid_indices]
+                centroid = np.mean(member_embeddings, axis=0)
+                norm = np.linalg.norm(centroid)
+                if norm > 0:
+                    centroid = centroid / norm
+                similarities = np.dot(member_embeddings, centroid)
+                ranked_local_indices = np.argsort(similarities)[::-1]
+                representative_titles = [cluster_texts[valid_indices[i]] for i in ranked_local_indices[:8]]
+            else:
+                representative_titles = cluster_texts[:8]
         else:
             representative_titles = cluster_texts[:8]
 
@@ -308,7 +316,8 @@ def generate_topic_labels(
         llm_label = _call_llm_for_cluster_label(representative_titles)
         if llm_label:
             labels[cluster_id] = llm_label
-            print(f"[Topic Labels] Cluster {cluster_id} -> '{llm_label}' (LLM Synthesized) | Titles: {representative_titles[:3]}")
+            # Fix #1: replaced print() with logger.debug()
+            logger.debug("[Topic Labels] Cluster %d -> '%s' (LLM Synthesized) | Titles: %s", cluster_id, llm_label, representative_titles[:3])
             continue
 
         # ------------------------------------------------------------
@@ -316,6 +325,7 @@ def generate_topic_labels(
         # ------------------------------------------------------------
         fallback_label = _extract_coherent_local_label(representative_titles, cluster_id)
         labels[cluster_id] = fallback_label
-        print(f"[Topic Labels] Cluster {cluster_id} -> '{fallback_label}' (Coherent Phrase Fallback) | Titles: {representative_titles[:3]}")
+        # Fix #1: replaced print() with logger.debug() — print bypasses logging and pollutes stdout in API context
+        logger.debug("[Topic Labels] Cluster %d -> '%s' (Coherent Phrase Fallback) | Titles: %s", cluster_id, fallback_label, representative_titles[:3])
 
     return labels

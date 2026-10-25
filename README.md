@@ -12,11 +12,15 @@ Drifter analyses your digital footprint across **YouTube**, **Spotify**, **GitHu
 
 | Source | Method |
 |---|---|
-| **YouTube / Google** | OAuth 2.0 + Google Data Portability API (`dataportability.myactivity.youtube`) |
-| **Spotify** | OAuth — top artists, listening trends, audio features |
-| **GitHub** | OAuth — starred repos, commit activity, programming topic evolution |
-| **Reddit** | OAuth — subreddits, saved posts, upvoted content, comment threads |
-| **Chrome Extension** | Real-time active dwell-time & watch-event capture across YouTube, Spotify Web, Netflix, Steam, Twitter/X, GitHub, and general browsing — zero manual exports |
+| **YouTube / Google** | OAuth 2.0 + Google Data Portability API (`dataportability.myactivity.youtube`) + Takeout import |
+| **Spotify** | OAuth 2.0 + Listening trends, recent tracks, and manual JSON/CSV import |
+| **GitHub** | OAuth 2.0 — Starred repos, commit activity, programming topic evolution |
+| **Reddit** | OAuth 2.0 + Account data export (saved posts, comments, upvoted JSON/CSV) |
+| **Netflix** | Viewing activity CSV export (`ViewingActivity.csv`) + Chrome Extension real-time watch logging |
+| **Steam** | Steam Web API Key & Steam ID library sync + Store/Community browsing extension |
+| **X / Twitter** | Twitter archive `tweets.js` / JSON import + real-time tweet thread tracker |
+| **Browser (Web)** | Chrome/Firefox browsing history JSON/CSV import + 360° dwell-time extension engine |
+| **Other (Custom)** | Generic JSON/CSV file ingestion for any custom data source or platform |
 
 ### 🤖 AI & ML Intelligence Engine
 

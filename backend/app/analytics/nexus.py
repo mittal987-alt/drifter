@@ -1,13 +1,11 @@
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 import math
-import random
 from typing import Any
 
-
-def _slugify(text: str) -> str:
-    return "".join(c if c.isalnum() else "_" for c in text.lower()).strip("_")
+# Maximum number of pairwise divergence pairs to compute (Fix #3: cap O(n²) work)
+_MAX_PAIRS = 50
 
 
 # Domain ontology mapping for high-serendipity bridge synthesis
@@ -58,7 +56,7 @@ def _generate_bridge_metadata(topic_a: str, topic_b: str, seed_num: int) -> dict
 
     # Use hash of sorted topics for deterministic variation
     pair_key = "-".join(sorted([topic_a.lower(), topic_b.lower()]))
-    h = int(hashlib.md5(pair_key.encode()).hexdigest(), 16) + seed_num
+    h = int(hashlib.md5(pair_key.encode(), usedforsecurity=False).hexdigest(), 16) + seed_num  # Fix #6
 
     # Title & Thesis Synthesizer
     prefixes = [
@@ -296,7 +294,11 @@ def generate_curiosity_nexus(
                 x1, y1 = center_coords[t1]
                 x2, y2 = center_coords[t2]
                 dist = math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
-                normalized_score = min(98, max(65, int(dist * 25 + 65)))
+                # Fix #4: skip pairs at the same 2D position (dist == 0 → score 65,
+                # misleadingly marked as serendipitous despite being identical clusters)
+                if dist == 0.0:
+                    continue
+                normalized_score = min(98, max(66, int(dist * 25 + 65)))
             else:
                 # Deterministic hash distance based on character divergence
                 pair_h = int(hashlib.sha256(f"{t1}-{t2}".encode()).hexdigest(), 16)
@@ -308,12 +310,29 @@ def generate_curiosity_nexus(
                 "serendipity_score": normalized_score,
             })
 
+            # Fix #3: stop early once we have enough pairs — top 4 presets + buffer
+            if len(divergence_pairs) >= _MAX_PAIRS:
+                break
+        else:
+            continue
+        break
+
     divergence_pairs.sort(key=lambda p: p["serendipity_score"], reverse=True)
 
     # 4. Resolve active topic_a and topic_b
     if not topic_a or not topic_b or topic_a == topic_b:
-        # Default to highest serendipity pair
-        top_pair = divergence_pairs[0] if divergence_pairs else {"topic_a": topic_list[0], "topic_b": topic_list[1], "serendipity_score": 92}
+        if divergence_pairs:
+            top_pair = divergence_pairs[0]
+        elif len(topic_list) >= 2:  # Fix #1: guard IndexError — only index [1] when it exists
+            top_pair = {"topic_a": topic_list[0], "topic_b": topic_list[1], "serendipity_score": 92}
+        else:
+            # Fewer than 2 usable topics — return a safe empty state
+            return {
+                "status": "INSUFFICIENT_DATA",
+                "message": "At least 2 distinct topics are required to generate a Curiosity Nexus.",
+                "available_topics": available_topics,
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+            }
         selected_a = top_pair["topic_a"]
         selected_b = top_pair["topic_b"]
         serendipity_val = top_pair["serendipity_score"]
@@ -325,7 +344,7 @@ def generate_curiosity_nexus(
         if found:
             serendipity_val = found["serendipity_score"]
         else:
-            seed_h = int(hashlib.md5(f"{selected_a}-{selected_b}".encode()).hexdigest(), 16)
+            seed_h = int(hashlib.md5(f"{selected_a}-{selected_b}".encode(), usedforsecurity=False).hexdigest(), 16)  # Fix #6
             serendipity_val = 80 + (seed_h % 18)
 
     # 5. Synthesize bridge metadata
@@ -368,5 +387,5 @@ def generate_curiosity_nexus(
         },
         "available_topics": available_topics,
         "suggested_presets": suggested_presets,
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),  # Fix #5
     }

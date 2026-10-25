@@ -1,9 +1,12 @@
 import base64
+import logging
 from urllib.parse import urlencode
 
 import httpx
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 SPOTIFY_AUTH_URL = "https://accounts.spotify.com/authorize"
@@ -137,10 +140,7 @@ async def sync_spotify_user_history(
     """
     Fetch user's recent and top tracks from Spotify API and save them to history_events.
     """
-    import json
-    from app.database.models import HistoryEvent
-    from app.services.history_service import normalize_spotify_event, create_event_hash
-    from app.services.analysis_cache_service import delete_cached_analysis
+    from app.services.history_service import normalize_spotify_event
 
     raw_items = []
 
@@ -154,7 +154,7 @@ async def sync_spotify_user_history(
         if isinstance(recent_data, dict) and "items" in recent_data:
             raw_items.extend(recent_data["items"])
     except Exception as exc:
-        print(f"[Spotify Sync] Error fetching recently-played: {exc}", flush=True)
+        logger.warning("[Spotify Sync] Error fetching recently-played: %s", exc)
 
     # 2. Fetch top tracks
     try:
@@ -166,7 +166,7 @@ async def sync_spotify_user_history(
         if isinstance(top_data, dict) and "items" in top_data:
             raw_items.extend(top_data["items"])
     except Exception as exc:
-        print(f"[Spotify Sync] Error fetching top tracks: {exc}", flush=True)
+        logger.warning("[Spotify Sync] Error fetching top tracks: %s", exc)
 
     from app.api.history import save_history_events
 
@@ -183,5 +183,10 @@ async def sync_spotify_user_history(
         source="spotify",
     )
 
-    print(f"[Spotify Sync] Completed for user {user_id}: {imported} imported, {duplicates} duplicates.", flush=True)
+    logger.info(
+        "[Spotify Sync] Completed for user %s: %s imported, %s duplicates.",
+        user_id,
+        imported,
+        duplicates,
+    )
     return {"imported": imported, "duplicates": duplicates, "total": len(raw_items)}

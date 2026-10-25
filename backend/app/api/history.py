@@ -1,5 +1,6 @@
 import json
-from datetime import datetime
+import logging
+from datetime import datetime, timezone
 
 import httpx
 from pydantic import BaseModel
@@ -31,9 +32,11 @@ from app.services.history_service import parse_history_file
 from app.services.analysis_cache_service import delete_cached_analysis
 from app.services.analysis_runner import run_user_analysis
 from app.analytics.topics import classify_single_event
-
+from app.reports.utils import parse_ts
 
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================
@@ -72,15 +75,7 @@ def save_history_events(
         seen_in_batch.add(event_hash)
         ev_source = event.get("source") or source
 
-        ts = event.get("timestamp")
-        if not isinstance(ts, datetime):
-            if isinstance(ts, str):
-                try:
-                    ts = datetime.fromisoformat(ts.replace("Z", "+00:00")).replace(tzinfo=None)
-                except Exception:
-                    ts = datetime.utcnow()
-            else:
-                ts = datetime.utcnow()
+        ts = parse_ts(event.get("timestamp")) or datetime.now(timezone.utc).replace(tzinfo=None)
 
         row_dict = {
             "user_id": user_id,
@@ -95,7 +90,7 @@ def save_history_events(
                 event.get("metadata", {}),
                 default=str,
             ),
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(timezone.utc).replace(tzinfo=None),
         }
         records_to_insert.append(row_dict)
 
@@ -198,7 +193,7 @@ async def import_history(
     # ---------------------------------------------------------
 
     SUPPORTED_SOURCES = {
-        "youtube", "spotify", "github", "reddit", "netflix", "steam", "browser", "twitter"
+        "youtube", "spotify", "github", "reddit", "netflix", "steam", "browser", "twitter", "other"
     }
 
     if source not in SUPPORTED_SOURCES:
@@ -275,7 +270,7 @@ async def import_history(
                 content=raw_bytes,
             )
         except ValueError as exc:
-            print(f"[HISTORY IMPORT ERROR] File '{file.filename}': {exc}", flush=True)
+            logger.error("[HISTORY IMPORT ERROR] File '%s': %s", file.filename, exc)
             raise HTTPException(
                 status_code=400,
                 detail=str(exc),
@@ -299,7 +294,7 @@ async def import_history(
             )
             total_records = len(events)
         except Exception as exc:
-            print(f"[{source.upper()} IMPORT ERROR] File '{file.filename}': {exc}", flush=True)
+            logger.error("[%s IMPORT ERROR] File '%s': %s", source.upper(), file.filename, exc)
             raise HTTPException(
                 status_code=400,
                 detail=f"Failed to parse {source.title()} history: {exc}",
@@ -322,9 +317,7 @@ async def import_history(
 
     except Exception as exc:
         db.rollback()
-        import traceback
-        traceback.print_exc()
-        print(f"[SAVE HISTORY ERROR]: {exc}", flush=True)
+        logger.error("[SAVE HISTORY ERROR]: %s", exc, exc_info=True)
 
         raise HTTPException(
             status_code=500,
@@ -653,11 +646,11 @@ async def steam_sync(
         rtime = game.get("rtime_last_played") or 0
         if rtime:
             try:
-                ts = datetime.utcfromtimestamp(rtime)
+                ts = datetime.fromtimestamp(rtime, tz=timezone.utc).replace(tzinfo=None)
             except Exception:
-                ts = datetime.utcnow()
+                ts = datetime.now(timezone.utc).replace(tzinfo=None)
         else:
-            ts = datetime.utcnow()
+            ts = datetime.now(timezone.utc).replace(tzinfo=None)
 
         events.append({
             "timestamp": ts,

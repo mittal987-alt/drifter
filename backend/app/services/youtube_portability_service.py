@@ -1,23 +1,15 @@
-import io
-import json
-import zipfile
+from io import BytesIO
 from typing import Any
+import zipfile
 
 from sqlalchemy.orm import Session
 
 from app.database.models import (
-    HistoryEvent,
     PortabilityExportJob,
 )
-
 from app.services.youtube_history_service import (
-    create_event_hash,
     load_youtube_history_file,
     parse_youtube_history,
-)
-
-from app.services.analysis_cache_service import (
-    delete_cached_analysis,
 )
 
 
@@ -35,7 +27,7 @@ def extract_youtube_history_from_archive(
 
     try:
         archive = zipfile.ZipFile(
-            io.BytesIO(archive_bytes)
+            BytesIO(archive_bytes)
         )
 
     except zipfile.BadZipFile as exc:

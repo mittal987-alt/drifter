@@ -1,6 +1,5 @@
-from typing import Any
-from datetime import datetime
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from datetime import datetime, timezone
+from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -33,6 +32,7 @@ class ExtensionSyncPayload(BaseModel):
 
 
 @router.get("/api/auth/extension-token")
+@router.get("/api/auth/token")
 def get_extension_token(
     user_id: int = Depends(get_current_user_id),
 ):
@@ -78,7 +78,7 @@ def sync_youtube_extension_history(
         else:
             event_url = None
 
-        ts = ev.watchedAt or datetime.utcnow()
+        ts = ev.watchedAt or datetime.now(timezone.utc).replace(tzinfo=None)
 
         metadata = {
             "videoId": ev.videoId,

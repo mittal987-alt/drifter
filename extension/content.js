@@ -176,7 +176,11 @@
      ========================================================================== */
   else if (host.includes("github.com")) {
     const parts = window.location.pathname.split("/").filter(Boolean);
-    if (parts.length >= 2 && !["settings", "notifications", "explore", "trending"].includes(parts[0])) {
+    const nonRepoRoutes = new Set([
+      "settings", "notifications", "explore", "trending", "pulls", "issues",
+      "marketplace", "topics", "search", "orgs", "stars", "discussions", "sponsors"
+    ]);
+    if (parts.length >= 2 && !nonRepoRoutes.has(parts[0])) {
       const repoName = `${parts[0]}/${parts[1]}`;
       setTimeout(() => {
         const desc = document.querySelector("p.f4, [itemprop='about']")?.textContent?.trim() || "";
@@ -361,6 +365,9 @@
      8. GENERAL WEB BROWSING (360° Curiosity Engine)
      ========================================================================== */
   else {
+    // Avoid running inside embedded iframes/widgets
+    if (window.top !== window.self) return;
+
     const isInternal =
       host === "localhost" ||
       host === "127.0.0.1" ||
@@ -377,6 +384,7 @@
 
     if (!isInternal && !isAuth && document.title) {
       let logged = false;
+      const startTime = Date.now();
 
       function logBrowserEvent() {
         if (logged) return;
@@ -392,7 +400,7 @@
           artist: cleanHost,
           url: window.location.href,
           source: "browser",
-          watchedSeconds: 25,
+          watchedSeconds: Math.max(5, Math.round((Date.now() - startTime) / 1000)),
           watchedAt: new Date().toISOString(),
         };
 
@@ -404,13 +412,15 @@
         });
       }
 
-      // Log after 5s of dwell time (down from 15s so quick visits still count)
+      // Log after 5s of dwell time
       const dwellTimer = setTimeout(logBrowserEvent, 5000);
 
-      // Also log immediately on page leave in case they left before 5s
+      // Only log on page leave if user was on the page for at least 3 seconds
       window.addEventListener("beforeunload", () => {
         clearTimeout(dwellTimer);
-        logBrowserEvent();
+        if (Date.now() - startTime >= 3000) {
+          logBrowserEvent();
+        }
       });
     }
   }

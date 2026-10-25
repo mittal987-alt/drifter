@@ -101,6 +101,7 @@ def create_interest_map(
         "topic_centers": calculate_topic_centers(result),
     }
 
+
 def calculate_topic_centers(
     points,
 ):

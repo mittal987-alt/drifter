@@ -1,6 +1,6 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
 from app.api.dependencies import get_current_user_id
 from app.database.database import SessionLocal
@@ -49,7 +49,7 @@ async def get_spotify_access_token(
         if (
             connection.expires_at
             and connection.expires_at
-            <= datetime.utcnow() + timedelta(seconds=60)
+            <= datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=60)
         ):
 
             if not connection.refresh_token:
@@ -67,7 +67,7 @@ async def get_spotify_access_token(
             )
 
             connection.expires_at = (
-                datetime.utcnow()
+                datetime.now(timezone.utc).replace(tzinfo=None)
                 + timedelta(
                     seconds=tokens.get(
                         "expires_in",

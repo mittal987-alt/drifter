@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
@@ -16,6 +16,10 @@ from sqlalchemy.types import TypeDecorator
 
 from app.database.database import Base
 from app.services.crypto import encrypt_token, decrypt_token
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class EncryptedToken(TypeDecorator):
@@ -76,7 +80,7 @@ class User(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow,
+        default=_utcnow,
     )
 
     # Relationships with cascade for clean account data wiping
@@ -150,7 +154,7 @@ class Connection(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow,
+        default=_utcnow,
     )
 
     user = relationship("User", back_populates="connections")
@@ -229,7 +233,7 @@ class HistoryEvent(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow,
+        default=_utcnow,
     )
 
     user = relationship("User", back_populates="history_events")
@@ -293,13 +297,13 @@ class AnalysisResult(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow,
+        default=_utcnow,
     )
 
     updated_at = Column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=_utcnow,
+        onupdate=_utcnow,
     )
 
     user = relationship("User", back_populates="analysis_results")
@@ -363,13 +367,13 @@ class PortabilityExportJob(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow,
+        default=_utcnow,
     )
 
     updated_at = Column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=_utcnow,
+        onupdate=_utcnow,
     )
 
     user = relationship("User", back_populates="export_jobs")

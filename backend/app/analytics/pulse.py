@@ -1,31 +1,8 @@
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
-
-def _parse_timestamp(ts: Any) -> datetime | None:
-    if isinstance(ts, datetime):
-        return ts
-    if isinstance(ts, (int, float)):
-        if ts > 1e11:
-            return datetime.utcfromtimestamp(ts / 1000.0)
-        return datetime.utcfromtimestamp(ts)
-    if isinstance(ts, str):
-        cleaned = ts.replace("Z", "+00:00").replace("/", "-").strip()
-        try:
-            return datetime.fromisoformat(cleaned).replace(tzinfo=None)
-        except Exception:
-            pass
-        for fmt in (
-            "%Y-%m-%d %H:%M:%S",
-            "%Y-%m-%d %H:%M",
-            "%Y-%m-%d",
-        ):
-            try:
-                return datetime.strptime(cleaned[:19], fmt)
-            except Exception:
-                continue
-    return None
+from app.reports.utils import parse_ts
 
 
 def generate_focus_pulse(
@@ -36,7 +13,16 @@ def generate_focus_pulse(
     Generate weekly activity heatmap, streak telemetry, and diurnal focus matrices
     from historical event logs.
     """
-    total_events = len(assignments)
+    # Fix #6: use timezone-aware now; compute once and reuse for both windowing and heatmap
+    now = datetime.now(timezone.utc).date()
+    window_start = now - timedelta(days=days_back - 1)
+
+    # Fix #4: window all telemetry to the same days_back range as the heatmap
+    windowed = [
+        ev for ev in assignments
+        if (ts := parse_ts(ev.get("timestamp"))) and ts.date() >= window_start
+    ]
+    total_events = len(windowed)
 
     # 1. Group events by date and extract diurnal patterns
     events_by_date: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -46,7 +32,7 @@ def generate_focus_pulse(
     weekend_events_count = 0
 
     # 7 days x 4 blocks matrix
-    # blocks: morning (5-11), afternoon (12-16), evening (17-20), night (21-4)
+    # blocks: morning (5-11), afternoon (12-16), evening (17-22), night (23-4)
     matrix_grid: dict[str, dict[str, int]] = {
         d: {"morning": 0, "afternoon": 0, "evening": 0, "night": 0}
         for d in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -55,8 +41,8 @@ def generate_focus_pulse(
     day_abbrs = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-    for event in assignments:
-        ts = _parse_timestamp(event.get("timestamp"))
+    for event in windowed:
+        ts = parse_ts(event.get("timestamp"))
         if not ts:
             continue
 
@@ -77,18 +63,18 @@ def generate_focus_pulse(
         if hour >= 23 or hour < 5:
             night_events_count += 1
 
-        # Matrix block
+        # Matrix block — night boundary: 23:00, consistent with rest of codebase (Fix #3)
         if 5 <= hour < 12:
             matrix_grid[dow_abbr]["morning"] += 1
         elif 12 <= hour < 17:
             matrix_grid[dow_abbr]["afternoon"] += 1
-        elif 17 <= hour < 21:
+        elif 17 <= hour < 23:
             matrix_grid[dow_abbr]["evening"] += 1
         else:
             matrix_grid[dow_abbr]["night"] += 1
 
     # 2. Build continuous day-by-day heatmap calendar grid
-    now = datetime.utcnow().date()
+    # `now` already defined above (Fix #6 — no second utcnow() call needed)
     start_date = now - timedelta(days=days_back - 1)
 
     # Adjust start_date to Monday for clean GitHub-style 7-row columns
@@ -137,26 +123,28 @@ def generate_focus_pulse(
             "dominant_topic": top_topic,
             "sources": source_counts,
             "samples": samples,
-            "is_future": curr > now,
+            # Fix #7: is_future removed — curr never exceeds now in this loop
         })
         curr += timedelta(days=1)
 
     # 3. Calculate Streaks
+    # Fix #1a: use a set for O(1) membership tests instead of list scan
     sorted_active_dates = sorted([datetime.strptime(d, "%Y-%m-%d").date() for d in all_dates_with_events])
+    active_date_set: set = set(sorted_active_dates)
     current_streak = 0
     longest_streak = 0
 
     if sorted_active_dates:
-        # Check current streak starting from today or yesterday
-        check_date = now
-        if check_date not in sorted_active_dates:
-            check_date = now - timedelta(days=1)
+        # Fix #1b: anchor from the last known active date, not unconditionally from
+        # today/yesterday — avoids returning 0 when the most recent activity is 2+ days ago.
+        last_active = sorted_active_dates[-1]
+        anchor = last_active if (now - last_active).days <= 1 else None
 
-        temp_curr = 0
-        while check_date in sorted_active_dates:
-            temp_curr += 1
-            check_date -= timedelta(days=1)
-        current_streak = temp_curr
+        if anchor is not None:
+            check_date = anchor
+            while check_date in active_date_set:
+                current_streak += 1
+                check_date -= timedelta(days=1)
 
         # Longest streak
         temp_streak = 1
@@ -166,7 +154,7 @@ def generate_focus_pulse(
                 temp_streak += 1
                 if temp_streak > longest_streak:
                     longest_streak = temp_streak
-            elif sorted_active_dates[i] > sorted_active_dates[i - 1] + timedelta(days=1):
+            else:
                 temp_streak = 1
 
     # 4. Telemetry summaries
@@ -177,26 +165,27 @@ def generate_focus_pulse(
         peak_block = "Morning (5 AM - 12 PM)"
     elif 12 <= peak_hour < 17:
         peak_block = "Afternoon (12 PM - 5 PM)"
-    elif 17 <= peak_hour < 21:
-        peak_block = "Evening (5 PM - 9 PM)"
+    elif 17 <= peak_hour < 23:
+        peak_block = "Evening (5 PM - 11 PM)"
     else:
-        peak_block = "Night (9 PM - 5 AM)"
+        peak_block = "Night (11 PM - 5 AM)"
 
     weekend_pct = round((weekend_events_count / max(total_events, 1)) * 100, 1)
     nocturnal_pct = round((night_events_count / max(total_events, 1)) * 100, 1)
 
-    # Flatten normalized matrix for heatmap table
-    matrix_list = []
-    max_block_val = max((v for row in matrix_grid.values() for v in row.values()), default=1)
-    for dow, blocks in matrix_grid.items():
-        matrix_list.append({
+    # Flatten matrix for the heatmap table
+    # Fix #5: removed dead max_block_val (was computed but never used for normalisation)
+    matrix_list = [
+        {
             "day": dow,
             "morning": blocks["morning"],
             "afternoon": blocks["afternoon"],
             "evening": blocks["evening"],
             "night": blocks["night"],
             "total": sum(blocks.values()),
-        })
+        }
+        for dow, blocks in matrix_grid.items()
+    ]
 
     return {
         "status": "READY",
@@ -210,5 +199,5 @@ def generate_focus_pulse(
         "nocturnal_percentage": nocturnal_pct,
         "heatmap": heatmap_cells,
         "matrix": matrix_list,
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
     }

@@ -10,8 +10,9 @@ Flow:
 """
 
 import hmac
+import logging
 import secrets
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import urlencode
 
 import httpx
@@ -25,6 +26,8 @@ from app.database.database import get_db, SessionLocal
 from app.database.models import Connection
 from app.services.github_service import sync_github_user_history
 from app.services.analysis_runner import run_user_analysis
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -86,10 +89,10 @@ def github_login(request: Request):
 @router.get("/callback")
 async def github_callback(
     request: Request,
+    background_tasks: BackgroundTasks,
     code: str | None = None,
     state: str | None = None,
     error: str | None = None,
-    background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     frontend = settings.FRONTEND_URL
 
@@ -138,7 +141,7 @@ async def github_callback(
         if conn:
             conn.access_token = access_token
             conn.scope = token_data.get("scope", GITHUB_SCOPES)
-            conn.created_at = datetime.utcnow()
+            conn.created_at = datetime.now(timezone.utc).replace(tzinfo=None)
         else:
             conn = Connection(
                 user_id=user_id,
@@ -147,7 +150,7 @@ async def github_callback(
                 refresh_token=None,
                 expires_at=None,
                 scope=token_data.get("scope", GITHUB_SCOPES),
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc).replace(tzinfo=None),
             )
             db.add(conn)
         db.commit()
@@ -167,7 +170,7 @@ async def _background_sync(user_id: int, access_token: str):
         run_user_analysis(user_id=user_id, source="github")
         run_user_analysis(user_id=user_id, source=None)
     except Exception as exc:
-        print(f"[GITHUB BACKGROUND SYNC ERROR] user={user_id}: {exc}", flush=True)
+        logger.error("[GITHUB BACKGROUND SYNC ERROR] user=%s: %s", user_id, exc, exc_info=True)
     finally:
         db.close()
 

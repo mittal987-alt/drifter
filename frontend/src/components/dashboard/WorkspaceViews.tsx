@@ -895,15 +895,24 @@ export function HistoryView({ dashboard, history, historyLoading, onRefresh }: W
   function handleExportCsv() {
     if (!filtered.length) return;
     const headers = ["ID", "Timestamp", "Source", "Title", "Artist", "Topic", "URL"];
-    const rows = filtered.map((e) => [
-      e.id,
-      `"${new Date(e.timestamp).toISOString()}"`,
-      `"${e.source || ""}"`,
-      `"${(e.title || "").replace(/"/g, '""')}"`,
-      `"${(e.artist || "").replace(/"/g, '""')}"`,
-      `"${(e.resolvedTopic || e.topic || "").replace(/"/g, '""')}"`,
-      `"${(e.url || "").replace(/"/g, '""')}"`,
-    ]);
+    const rows = filtered.map((e) => {
+      let tsStr = "";
+      try {
+        const d = new Date(e.timestamp);
+        tsStr = isNaN(d.getTime()) ? String(e.timestamp || "") : d.toISOString();
+      } catch {
+        tsStr = String(e.timestamp || "");
+      }
+      return [
+        e.id,
+        `"${tsStr}"`,
+        `"${e.source || ""}"`,
+        `"${(e.title || "").replace(/"/g, '""')}"`,
+        `"${(e.artist || "").replace(/"/g, '""')}"`,
+        `"${(e.resolvedTopic || e.topic || "").replace(/"/g, '""')}"`,
+        `"${(e.url || "").replace(/"/g, '""')}"`,
+      ];
+    });
     const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);

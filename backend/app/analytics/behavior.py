@@ -2,33 +2,26 @@ from collections import Counter, defaultdict
 from datetime import datetime
 from math import log2
 
-
-def parse_timestamp(timestamp):
-    if isinstance(timestamp, datetime):
-        return timestamp
-    if isinstance(timestamp, str):
-        try:
-            return datetime.fromisoformat(
-                timestamp.replace("Z", "+00:00")
-            ).replace(tzinfo=None)
-        except Exception:
-            pass
-    return None
+from app.reports.utils import parse_ts
 
 
 # ============================================================
 # TIME OF DAY
 # ============================================================
 
-def get_time_of_day(hour: int):
+def get_time_of_day(hour: int) -> str:
+    """Map an hour (0-23) to a named time block.
 
+    Boundaries are consistent with pulse.py and the nocturnal ratio
+    used in year_in_drift.py / interest_dna.py (night = 23:00 - 04:59).
+    """
     if 5 <= hour < 12:
         return "morning"
 
     if 12 <= hour < 17:
         return "afternoon"
 
-    if 17 <= hour < 21:
+    if 17 <= hour < 23:  # Fix #4: was < 21, now < 23
         return "evening"
 
     return "night"
@@ -40,16 +33,12 @@ def analyze_time_of_day(assignments):
 
     for event in assignments:
 
-        timestamp = parse_timestamp(
-            event.get("timestamp")
-        )
+        ts = parse_ts(event.get("timestamp"))
 
-        if not timestamp:
+        if not ts:
             continue
 
-        period = get_time_of_day(
-            timestamp.hour
-        )
+        period = get_time_of_day(ts.hour)
 
         topic = event.get("topic", "Other")
 
@@ -79,16 +68,12 @@ def analyze_day_of_week(assignments):
 
     for event in assignments:
 
-        timestamp = parse_timestamp(
-            event.get("timestamp")
-        )
+        ts = parse_ts(event.get("timestamp"))
 
-        if not timestamp:
+        if not ts:
             continue
 
-        day = timestamp.strftime(
-            "%A"
-        )
+        day = ts.strftime("%A")
 
         topic = event.get("topic", "Other")
 
@@ -116,7 +101,7 @@ def analyze_topic_transitions(
 
     events = sorted(
         assignments,
-        key=lambda x: parse_timestamp(x.get("timestamp")) or datetime.min
+        key=lambda x: parse_ts(x.get("timestamp")) or datetime.min
     )
 
     transitions = Counter()
@@ -126,13 +111,8 @@ def analyze_topic_transitions(
         events[1:]
     ):
 
-        previous_time = parse_timestamp(
-            previous.get("timestamp")
-        )
-
-        current_time = parse_timestamp(
-            current.get("timestamp")
-        )
+        previous_time = parse_ts(previous.get("timestamp"))
+        current_time = parse_ts(current.get("timestamp"))
 
         if not previous_time or not current_time:
             continue
@@ -141,6 +121,11 @@ def analyze_topic_transitions(
             current_time
             - previous_time
         ).total_seconds() / 60
+
+        # Fix #2: skip pairs where timestamps are inverted or both failed to parse
+        # (both None sort to datetime.min, producing gap=0 which would be silently accepted)
+        if gap < 0:
+            continue
 
         if gap > max_gap_minutes:
             continue
@@ -189,7 +174,7 @@ def detect_rabbit_holes(
 
     events = sorted(
         assignments,
-        key=lambda x: parse_timestamp(x.get("timestamp")) or datetime.min
+        key=lambda x: parse_ts(x.get("timestamp")) or datetime.min
     )
 
     sessions = []
@@ -202,22 +187,21 @@ def detect_rabbit_holes(
 
         previous = current_session[-1]
 
-        previous_time = parse_timestamp(
-            previous.get("timestamp")
-        )
-
-        current_time = parse_timestamp(
-            event.get("timestamp")
-        )
+        previous_time = parse_ts(previous.get("timestamp"))
+        current_time = parse_ts(event.get("timestamp"))
 
         if not previous_time or not current_time:
-            current_session = [event]
+            # Fix #6: skip unparseable pair without destroying the accumulated session
             continue
 
         gap = (
             current_time
             - previous_time
         ).total_seconds() / 60
+
+        # Fix #2: skip pairs where timestamps are inverted or both failed to parse
+        if gap < 0:
+            continue
 
         if gap <= session_gap_minutes:
 
@@ -252,13 +236,12 @@ def detect_rabbit_holes(
             for event in session
         )
 
-        start = parse_timestamp(
-            session[0].get("timestamp")
-        ) or datetime.utcnow()
+        start = parse_ts(session[0].get("timestamp"))
+        end = parse_ts(session[-1].get("timestamp"))
 
-        end = parse_timestamp(
-            session[-1].get("timestamp")
-        ) or datetime.utcnow()
+        # Skip session if boundary timestamps can't be parsed (avoids fabricated durations)
+        if not start or not end:
+            continue
 
         duration_minutes = (
             end - start
@@ -297,7 +280,7 @@ def detect_rabbit_holes(
                 {
                     "title": e.get("title") or "Untitled",
                     "source": e.get("source") or "unknown",
-                    "timestamp": (parse_timestamp(e.get("timestamp")) or datetime.utcnow()).isoformat(),
+                    "timestamp": (parse_ts(e.get("timestamp")) or datetime.min).isoformat(),
                     "topic": e.get("topic") or "Other",
                     "artist": e.get("artist"),
                     "url": e.get("url"),
@@ -355,7 +338,7 @@ def calculate_interest_concentration(
 ):
 
     counts = Counter(
-        event["topic"]
+        event.get("topic", "Other")
         for event in assignments
     )
 

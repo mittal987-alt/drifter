@@ -47,7 +47,8 @@ def _ts_from_created(created_utc: Any) -> datetime:
     try:
         return datetime.fromtimestamp(float(created_utc), tz=timezone.utc).replace(tzinfo=None)
     except Exception:
-        return datetime.utcnow()
+        return datetime.now(timezone.utc).replace(tzinfo=None)
+
 
 
 def _normalize_reddit_child(child: dict, label: str) -> dict | None:

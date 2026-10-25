@@ -1,4 +1,5 @@
 import json
+import logging
 
 from sqlalchemy.orm import Session
 
@@ -7,6 +8,8 @@ from app.database.models import AnalysisResult
 from app.services.analytics_service import (
     analyze_user_history,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def set_analysis_status(
@@ -64,10 +67,10 @@ def run_user_analysis(
             status="RUNNING",
         )
 
-        print(
-            f"[Analysis] Starting "
-            f"user={user_id}, source={source}",
-            flush=True,
+        logger.info(
+            "[Analysis] Starting user=%s, source=%s",
+            user_id,
+            source,
         )
 
         # -----------------------------------------------------
@@ -92,10 +95,10 @@ def run_user_analysis(
             error=None,
         )
 
-        print(
-            f"[Analysis] Completed "
-            f"user={user_id}, source={source}",
-            flush=True,
+        logger.info(
+            "[Analysis] Completed user=%s, source=%s",
+            user_id,
+            source,
         )
 
     except Exception as exc:
@@ -104,12 +107,12 @@ def run_user_analysis(
 
         error_message = str(exc)
 
-        print(
-            f"[Analysis] FAILED "
-            f"user={user_id}, "
-            f"source={source}: "
-            f"{error_message}",
-            flush=True,
+        logger.error(
+            "[Analysis] FAILED user=%s, source=%s: %s",
+            user_id,
+            source,
+            error_message,
+            exc_info=True,
         )
 
         try:
@@ -124,4 +127,4 @@ def run_user_analysis(
             db.rollback()
 
     finally:
-        db.close()
+        db.close()

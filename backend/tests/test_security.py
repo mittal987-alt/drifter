@@ -12,7 +12,7 @@ Covers:
 
 import json
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.database.models import User, Connection, HistoryEvent, AnalysisResult, PortabilityExportJob
 from app.api.dependencies import generate_extension_token
@@ -151,7 +151,7 @@ class TestAuthorizationAndIDOR:
         # Add event for User B
         event_b = HistoryEvent(
             user_id=user_b.id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
             source="youtube",
             title="User B Private Video",
             event_hash="hash_b_1",
@@ -419,7 +419,7 @@ class TestPrivacyAndLifecycle:
         db_session.refresh(user)
         uid = user.id
 
-        event = HistoryEvent(user_id=uid, timestamp=datetime.utcnow(), source="youtube", title="V", event_hash="dh1")
+        event = HistoryEvent(user_id=uid, timestamp=datetime.now(timezone.utc).replace(tzinfo=None), source="youtube", title="V", event_hash="dh1")
         conn = Connection(user_id=uid, provider="youtube", access_token="t1")
         analysis = AnalysisResult(user_id=uid, source="youtube", analysis_json="{}")
         job = PortabilityExportJob(user_id=uid, archive_job_id="job_del", status="READY")

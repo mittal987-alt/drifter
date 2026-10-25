@@ -1,5 +1,4 @@
 from collections import Counter, defaultdict
-from datetime import datetime
 from typing import Any
 
 
@@ -18,15 +17,7 @@ SOURCE_META = {
 }
 
 
-def _parse_ts(ts: Any) -> datetime | None:
-    if isinstance(ts, datetime):
-        return ts
-    if isinstance(ts, str):
-        try:
-            return datetime.fromisoformat(ts.replace("Z", "+00:00")).replace(tzinfo=None)
-        except Exception:
-            return None
-    return None
+from app.reports.utils import parse_ts
 
 
 def analyze_cross_platform_correlation(
@@ -78,8 +69,8 @@ def analyze_cross_platform_correlation(
     daypart_dominance = {
         "Morning (5AM–12PM)":   daypart_counts(list(range(5, 12))),
         "Afternoon (12PM–5PM)": daypart_counts(list(range(12, 17))),
-        "Evening (5PM–9PM)":    daypart_counts(list(range(17, 21))),
-        "Night (9PM–5AM)":      daypart_counts(list(range(21, 24)) + list(range(0, 5))),
+        "Evening (5PM–11PM)":   daypart_counts(list(range(17, 23))),  # Fix #2: 23:00 boundary
+        "Night (11PM–5AM)":     daypart_counts(list(range(23, 24)) + list(range(0, 5))),
     }
 
     # 24-hour chart (one column per source per hour)
@@ -174,9 +165,7 @@ def analyze_cross_platform_correlation(
     platform_split = {**source_counts}
     for src in ALL_SOURCES:
         platform_split[f"{src}_pct"] = round((source_counts[src] / max(total, 1)) * 100, 1)
-    # Legacy compat
-    platform_split["youtube_pct"] = round((source_counts["youtube"] / max(total, 1)) * 100, 1)
-    platform_split["spotify_pct"] = round((source_counts["spotify"] / max(total, 1)) * 100, 1)
+    # Fix #3: removed redundant youtube_pct/spotify_pct overwrites — already set by the loop above
 
     active_labels = [SOURCE_META.get(s, {}).get("label", s) for s in active_sources]
     insight = (
@@ -215,8 +204,8 @@ def _build_modes(daypart_dominance: dict, active_sources: list[str]) -> list[dic
             return ranked[0][0], ""
         return "", ""
 
-    evening_a, evening_b = top_two("Evening (5PM–9PM)")
-    night_a, night_b = top_two("Night (9PM–5AM)")
+    evening_a, evening_b = top_two("Evening (5PM–11PM)")
+    night_a, night_b = top_two("Night (11PM–5AM)")
     morning_a, morning_b = top_two("Morning (5AM–12PM)")
 
     def label(src: str) -> str:

@@ -8,7 +8,7 @@ Fetches:
 and normalizes them into Drifter history_events with source="github".
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -53,7 +53,7 @@ async def fetch_starred_repos(token: str, max_pages: int = 5) -> list[dict]:
             try:
                 ts = datetime.fromisoformat((ts_str or "").replace("Z", "+00:00")).replace(tzinfo=None)
             except Exception:
-                ts = datetime.utcnow()
+                ts = datetime.now(timezone.utc).replace(tzinfo=None)
 
             topics = repo.get("topics") or []
             lang = repo.get("language") or ""
@@ -110,7 +110,7 @@ async def fetch_user_events(token: str, username: str, max_pages: int = 3) -> li
                     (ev.get("created_at") or "").replace("Z", "+00:00")
                 ).replace(tzinfo=None)
             except Exception:
-                ts = datetime.utcnow()
+                ts = datetime.now(timezone.utc).replace(tzinfo=None)
 
             repo = ev.get("repo") or {}
             repo_name = repo.get("name") or ""

@@ -1,8 +1,9 @@
 import asyncio
 import io
 import json
+import logging
 import zipfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import (
@@ -18,7 +19,6 @@ from app.api.dependencies import get_current_user_id
 from app.database.database import SessionLocal, get_db
 from app.database.models import (
     Connection,
-    HistoryEvent,
     PortabilityExportJob,
 )
 
@@ -30,19 +30,15 @@ from app.services.google_service import (
 )
 
 from app.services.youtube_history_service import (
-    create_event_hash,
     load_youtube_history_file,
     parse_youtube_history,
-)
-
-from app.services.analysis_cache_service import (
-    delete_cached_analysis,
 )
 
 from app.services.analysis_runner import (
     run_user_analysis,
 )
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -82,7 +78,7 @@ async def get_youtube_access_token(
     if (
         connection.expires_at
         and connection.expires_at
-        <= datetime.utcnow()
+        <= datetime.now(timezone.utc).replace(tzinfo=None)
         + timedelta(seconds=60)
     ):
 
@@ -131,7 +127,7 @@ async def get_youtube_access_token(
         )
 
         connection.expires_at = (
-            datetime.utcnow()
+            datetime.now(timezone.utc).replace(tzinfo=None)
             + timedelta(
                 seconds=int(
                     tokens.get(
@@ -486,9 +482,7 @@ def update_export_job(
     if skipped is not None:
         job.skipped = skipped
 
-    job.error = error
-
-    job.updated_at = datetime.utcnow()
+    job.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     db.commit()
 
@@ -583,14 +577,13 @@ async def download_and_import_archive(
             error=None,
         )
 
-        print(
-            "[Google Import] "
-            f"user={user_id} "
-            f"job={job_id} "
-            f"imported={imported} "
-            f"duplicates={duplicates} "
-            f"skipped={skipped}",
-            flush=True,
+        logger.info(
+            "[Google Import] user=%s job=%s imported=%s duplicates=%s skipped=%s",
+            user_id,
+            job_id,
+            imported,
+            duplicates,
+            skipped,
         )
 
         # -------------------------------------------------
@@ -609,11 +602,12 @@ async def download_and_import_archive(
 
         db.rollback()
 
-        print(
-            "[Google Import] FAILED "
-            f"user={user_id} "
-            f"job={job_id}: {exc}",
-            flush=True,
+        logger.error(
+            "[Google Import] FAILED user=%s job=%s: %s",
+            user_id,
+            job_id,
+            exc,
+            exc_info=True,
         )
 
         job = (
@@ -633,7 +627,7 @@ async def download_and_import_archive(
 
             job.status = "FAILED"
             job.error = str(exc)
-            job.updated_at = datetime.utcnow()
+            job.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
             db.commit()
 
@@ -796,7 +790,7 @@ async def google_data_portability_status(
     if (
         connection.expires_at
         and connection.expires_at
-        <= datetime.utcnow()
+        <= datetime.now(timezone.utc).replace(tzinfo=None)
         + timedelta(seconds=60)
     ):
 
@@ -847,7 +841,7 @@ async def google_data_portability_status(
         )
 
         connection.expires_at = (
-            datetime.utcnow()
+            datetime.now(timezone.utc).replace(tzinfo=None)
             + timedelta(
                 seconds=int(
                     tokens.get(

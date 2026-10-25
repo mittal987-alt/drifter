@@ -32,7 +32,7 @@ class TTLCache:
             if entry is None:
                 return None
             value, expires_at = entry
-            if time.monotonic() > expires_at:
+            if time.monotonic() >= expires_at:
                 del self._store[key]
                 logger.debug("Cache MISS (expired): %s", key)
                 return None
@@ -41,6 +41,10 @@ class TTLCache:
 
     def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
         effective_ttl = ttl if ttl is not None else self.default_ttl
+        if effective_ttl <= 0:
+            with self._lock:
+                self._store.pop(key, None)
+            return
         expires_at = time.monotonic() + effective_ttl
         with self._lock:
             self._store[key] = (value, expires_at)

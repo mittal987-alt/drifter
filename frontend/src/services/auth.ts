@@ -18,8 +18,13 @@ export const authService = {
   },
 
   async getSyncToken(): Promise<{ user_id: number; token: string }> {
-    const response = await apiClient.get<{ user_id: number; token: string }>("/api/auth/token");
-    return response.data;
+    try {
+      const response = await apiClient.get<{ user_id: number; token: string }>("/api/auth/extension-token");
+      return response.data;
+    } catch {
+      const response = await apiClient.get<{ user_id: number; token: string }>("/api/auth/token");
+      return response.data;
+    }
   },
 
   async logout(): Promise<void> {

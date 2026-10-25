@@ -8,9 +8,12 @@ export type HistorySource =
   | "youtube"
   | "spotify"
   | "github"
+  | "reddit"
+  | "netflix"
   | "steam"
   | "twitter"
-  | "browser";
+  | "browser"
+  | "other";
 
 export interface HistoryEvent {
   id: number;

@@ -52,8 +52,13 @@ export function useWebSocket(
 
       ws.onerror = () => setStatus("error");
 
-      ws.onclose = () => {
+      ws.onclose = (event: CloseEvent) => {
         setStatus("disconnected");
+        // Step down retry attempts if unauthorized or policy violation
+        if (event.code === 1008) {
+          retriesRef.current = maxRetries;
+          return;
+        }
         if (retriesRef.current < maxRetries) {
           retriesRef.current += 1;
           const delay = reconnectDelay * Math.pow(1.5, retriesRef.current - 1);

@@ -12,6 +12,7 @@ Supports:
 import base64
 import hashlib
 import logging
+import os
 from typing import Optional
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -29,7 +30,7 @@ def get_fernet_key() -> bytes:
     Prefers TOKEN_ENCRYPTION_KEY from settings/environment.
     Falls back to a key derived from SESSION_SECRET with a domain separation salt.
     """
-    raw_key = getattr(settings, "TOKEN_ENCRYPTION_KEY", None)
+    raw_key = os.getenv("TOKEN_ENCRYPTION_KEY") or getattr(settings, "TOKEN_ENCRYPTION_KEY", None)
     if raw_key and len(raw_key.strip()) > 0:
         cleaned = raw_key.strip().encode("utf-8")
         # If it's already a valid Fernet key (32 bytes base64 encoded = 44 chars)
@@ -42,7 +43,8 @@ def get_fernet_key() -> bytes:
             return base64.urlsafe_b64encode(digest)
 
     # Derive deterministic key from SESSION_SECRET with domain separation
-    secret = settings.SESSION_SECRET.encode("utf-8")
+    raw_secret = os.getenv("SESSION_SECRET") or settings.SESSION_SECRET
+    secret = raw_secret.encode("utf-8")
     salt = b"drifter-token-encryption-salt-v1"
     derived = hashlib.pbkdf2_hmac("sha256", secret, salt, 100000)
     return base64.urlsafe_b64encode(derived)

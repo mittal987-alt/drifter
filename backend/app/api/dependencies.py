@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import os
 from fastapi import HTTPException, Request
 
 from app.config import settings
@@ -9,8 +10,9 @@ from app.database.models import User
 
 def generate_extension_token(user_id: int) -> str:
     """Generate a signed sync token for the Chrome extension."""
+    secret = os.getenv("SESSION_SECRET") or settings.SESSION_SECRET
     sig = hmac.new(
-        settings.SESSION_SECRET.encode(),
+        secret.encode(),
         f"ext_{user_id}".encode(),
         hashlib.sha256,
     ).hexdigest()[:32]
@@ -34,8 +36,9 @@ def verify_extension_token(token: str) -> int | None:
         if len(parts) >= 4:
             user_id = int(parts[2])
             sig = parts[3]
+            secret = os.getenv("SESSION_SECRET") or settings.SESSION_SECRET
             full_sig = hmac.new(
-                settings.SESSION_SECRET.encode(),
+                secret.encode(),
                 f"ext_{user_id}".encode(),
                 hashlib.sha256,
             ).hexdigest()

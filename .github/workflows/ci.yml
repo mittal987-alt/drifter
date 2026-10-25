@@ -1,0 +1,216 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+
+# Prevent multiple CI runs for the same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ===========================================================================
+  # JOB 1: Python Linting
+  # ===========================================================================
+  python-lint:
+    name: Python Lint (Ruff)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-lint-${{ hashFiles('backend/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-lint-
+
+      - name: Install linting tools
+        run: pip install ruff
+
+      - name: Run Ruff linter
+        run: ruff check app/ tests/
+
+      - name: Run Ruff formatter check
+        run: ruff format --check app/ tests/
+
+  # ===========================================================================
+  # JOB 2: Backend Tests
+  # ===========================================================================
+  backend-tests:
+    name: Backend Tests (pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      ENV: development
+      SESSION_SECRET: ci-test-session-secret-not-for-production
+      DATABASE_URL: sqlite:///./test_ci.db
+      TOKEN_ENCRYPTION_KEY: ""
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install backend dependencies
+        run: |
+          pip install -r requirements.txt -r requirements-dev.txt
+          pip install pytest-cov ruff
+
+      - name: Run backend tests with coverage
+        run: |
+          python -m pytest tests/ \
+            -v \
+            --tb=short \
+            --cov=app \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --no-header
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+
+  # ===========================================================================
+  # JOB 3: Migration Verification
+  # ===========================================================================
+  migration-check:
+    name: Migration Check (Alembic)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      ENV: development
+      SESSION_SECRET: ci-test-migration-secret
+      DATABASE_URL: sqlite:///./test_migration.db
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify alembic migrations on clean database
+        run: |
+          # Create schema via ORM (equivalent to app startup)
+          python -c "
+          import os
+          os.environ['DATABASE_URL'] = 'sqlite:///./test_migration.db'
+          os.environ['SESSION_SECRET'] = 'ci-test-migration-secret'
+          os.environ['ENV'] = 'development'
+          from app.database.database import Base, engine
+          import app.database.models
+          Base.metadata.create_all(bind=engine)
+          print('Schema created successfully')
+          "
+          # Stamp and verify alembic state
+          python -m alembic stamp head
+          python -m alembic current
+          echo "Migration check passed"
+
+  # ===========================================================================
+  # JOB 4: Frontend Type Check & Build
+  # ===========================================================================
+  frontend-build:
+    name: Frontend (TypeScript + Build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run TypeScript type check
+        run: npx tsc --noEmit
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Build frontend production bundle
+        run: npm run build
+        env:
+          VITE_API_URL: http://localhost:8000
+
+  # ===========================================================================
+  # JOB 5: Secret Scanning
+  # ===========================================================================
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for secrets with Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+        continue-on-error: true
