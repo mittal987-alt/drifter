@@ -136,10 +136,12 @@ def get_me(
 # ---------------------------------------------------------
 
 @router.post("/register")
+@router.post("/register")
 def register(
     payload: RegisterRequest,
     request: Request,
     db: Session = Depends(get_db),
+):
     email = payload.email.strip().lower()
     if not email or "@" not in email or "." not in email:
         raise HTTPException(status_code=400, detail="Invalid email address.")
@@ -1098,4 +1100,4 @@ def delete_user_account(
         "success": True,
         "message": "Account and all associated personal data permanently deleted.",
     }
-
+
