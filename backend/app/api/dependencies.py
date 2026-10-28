@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import hashlib
 import hmac
 import os
@@ -5,7 +6,7 @@ from fastapi import HTTPException, Request
 
 from app.config import settings
 from app.database.database import SessionLocal
-from app.database.models import User
+from app.database.models import User, ExtensionToken
 
 
 def generate_extension_token(user_id: int) -> str:
@@ -28,6 +29,30 @@ def verify_extension_token(token: str) -> int | None:
     if clean_token.lower().startswith("bearer "):
         clean_token = clean_token[7:].strip()
 
+    # 1. Database-backed revocable tokens (drft_...)
+    if clean_token.startswith("drft_"):
+        token_hash = hashlib.sha256(clean_token.encode("utf-8")).hexdigest()
+        db = SessionLocal()
+        try:
+            record = (
+                db.query(ExtensionToken)
+                .filter(
+                    ExtensionToken.token_hash == token_hash,
+                    ExtensionToken.is_revoked.is_(False),
+                )
+                .first()
+            )
+            if record:
+                record.last_used_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                db.commit()
+                return record.user_id
+            return None
+        except Exception:
+            return None
+        finally:
+            db.close()
+
+    # 2. Legacy HMAC-signed extension tokens (drifter_ext_...)
     if not clean_token.startswith("drifter_ext_"):
         return None
 
@@ -71,6 +96,10 @@ def get_current_user_id(
                     return int(user.id)
             finally:
                 db.close()
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or revoked authentication token.",
+        )
 
     # 2. Check session
     user_id = request.session.get("user_id")

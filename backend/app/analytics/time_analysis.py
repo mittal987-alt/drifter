@@ -8,6 +8,9 @@ from scipy.spatial.distance import jensenshannon
 from app.analytics.topics import normalize_topic_name  # Fix #4: moved from mid-file
 from app.reports.utils import parse_ts
 
+# Alias for backwards compatibility with tests
+parse_timestamp = parse_ts
+
 
 # ============================================================
 # HELPERS

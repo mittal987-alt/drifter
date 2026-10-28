@@ -32,7 +32,6 @@ class ExtensionSyncPayload(BaseModel):
 
 
 @router.get("/api/auth/extension-token")
-@router.get("/api/auth/token")
 def get_extension_token(
     user_id: int = Depends(get_current_user_id),
 ):

@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import json
 import logging
 import os
 import secrets
@@ -17,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import generate_extension_token, get_current_user_id
 from app.config import settings
 from app.database.database import get_db
-from app.database.models import Connection, User
+from app.database.models import Connection, User, ExtensionToken, ExtensionAuthSession
 from app.database.models import PortabilityExportJob
 from app.services.google_service import (
     GOOGLE_DATA_PORTABILITY_YOUTUBE_SCOPE,
@@ -136,7 +137,6 @@ def get_me(
 # ---------------------------------------------------------
 
 @router.post("/register")
-@router.post("/register")
 def register(
     payload: RegisterRequest,
     request: Request,
@@ -247,6 +247,185 @@ def get_user_sync_token(
             "x_sync_token": f"X-Sync-Token: {token}",
         },
     }
+
+
+# ---------------------------------------------------------
+# Extension Seamless Connection & Revocation
+# ---------------------------------------------------------
+
+class ExtensionAuthorizeRequest(BaseModel):
+    client_name: str | None = "Chrome Extension"
+    permissions: list[str] | None = ["youtube", "spotify", "web"]
+
+
+class ExtensionExchangeRequest(BaseModel):
+    code: str
+    client_name: str | None = None
+
+
+# Ephemeral in-memory store for 60-second one-time authorization codes
+_pending_extension_codes: dict[str, dict] = {}
+
+
+@router.post("/extension/authorize")
+def authorize_extension(
+    payload: ExtensionAuthorizeRequest = ExtensionAuthorizeRequest(),
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """
+    Generate a short-lived (60s) one-time authorization code for the Chrome extension.
+    Invoked securely from the user's authenticated web session.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or getattr(user, "is_active", True) is False:
+        raise HTTPException(status_code=403, detail="User account is inactive or not found.")
+
+    # Prune expired authorization codes
+    now = datetime.now(timezone.utc)
+    expired = [c for c, data in _pending_extension_codes.items() if data["expires_at"] < now]
+    for c in expired:
+        _pending_extension_codes.pop(c, None)
+
+    code = secrets.token_urlsafe(32)
+    client_name = (payload.client_name or "Chrome Extension").strip()
+    perms = payload.permissions or ["youtube", "spotify", "web"]
+
+    _pending_extension_codes[code] = {
+        "user_id": user.id,
+        "expires_at": now + timedelta(seconds=60),
+        "client_name": client_name,
+        "permissions": perms,
+    }
+
+    return {
+        "code": code,
+        "expires_in": 60,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+        },
+    }
+
+
+@router.post("/extension/exchange")
+def exchange_extension_code(
+    payload: ExtensionExchangeRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Exchange a short-lived one-time authorization code for a revokable extension sync token.
+    Invoked directly by the Chrome extension service worker during connection setup.
+    """
+    code = payload.code.strip() if payload.code else ""
+    if not code:
+        raise HTTPException(status_code=400, detail="Authorization code is required.")
+
+    code_data = _pending_extension_codes.pop(code, None)
+    if not code_data:
+        raise HTTPException(status_code=400, detail="Invalid or expired authorization code.")
+
+    if datetime.now(timezone.utc) > code_data["expires_at"]:
+        raise HTTPException(status_code=400, detail="Authorization code has expired.")
+
+    user_id = code_data["user_id"]
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or getattr(user, "is_active", True) is False:
+        raise HTTPException(status_code=403, detail="Account is deactivated or not found.")
+
+    raw_token = f"drft_{secrets.token_urlsafe(32)}"
+    token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+    client_name = payload.client_name or code_data.get("client_name") or "Chrome Extension"
+    perms = code_data.get("permissions") or ["youtube", "spotify", "web"]
+
+    token_record = ExtensionToken(
+        user_id=user.id,
+        token_hash=token_hash,
+        token_prefix=f"{raw_token[:9]}...",
+        client_name=client_name,
+        permissions=json.dumps(perms),
+        is_revoked=False,
+    )
+    db.add(token_record)
+    db.commit()
+    db.refresh(token_record)
+
+    return {
+        "success": True,
+        "token": raw_token,
+        "token_id": token_record.id,
+        "client_name": token_record.client_name,
+        "permissions": perms,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+        },
+    }
+
+
+@router.get("/extension/tokens")
+def list_extension_tokens(
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """
+    List all registered extension clients and their active/revoked token status for this user.
+    """
+    tokens = (
+        db.query(ExtensionToken)
+        .filter(ExtensionToken.user_id == user_id)
+        .order_by(ExtensionToken.created_at.desc())
+        .all()
+    )
+    return {
+        "tokens": [
+            {
+                "id": t.id,
+                "client_name": t.client_name,
+                "token_prefix": t.token_prefix,
+                "permissions": json.loads(t.permissions) if t.permissions and t.permissions.startswith("[") else t.permissions,
+                "is_revoked": t.is_revoked,
+                "created_at": t.created_at.isoformat() if t.created_at else None,
+                "last_used_at": t.last_used_at.isoformat() if t.last_used_at else None,
+                "revoked_at": t.revoked_at.isoformat() if t.revoked_at else None,
+            }
+            for t in tokens
+        ]
+    }
+
+
+@router.delete("/extension/tokens/{token_id}")
+def revoke_extension_token(
+    token_id: int,
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """
+    Revoke a specific extension client token. Immediately blocks subsequent sync attempts with 401.
+    """
+    token_record = (
+        db.query(ExtensionToken)
+        .filter(
+            ExtensionToken.id == token_id,
+            ExtensionToken.user_id == user_id,
+        )
+        .first()
+    )
+    if not token_record:
+        raise HTTPException(status_code=404, detail="Extension token not found.")
+
+    token_record.is_revoked = True
+    token_record.revoked_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"Extension '{token_record.client_name}' access revoked.",
+        "token_id": token_id,
+    }
+
 
 
 # ---------------------------------------------------------
@@ -1089,6 +1268,7 @@ def delete_user_account(
     db.query(Connection).filter(Connection.user_id == user_id).delete(synchronize_session=False)
     db.query(AnalysisResult).filter(AnalysisResult.user_id == user_id).delete(synchronize_session=False)
     db.query(PortabilityExportJob).filter(PortabilityExportJob.user_id == user_id).delete(synchronize_session=False)
+    db.query(ExtensionToken).filter(ExtensionToken.user_id == user_id).delete(synchronize_session=False)
     db.delete(user)
     db.commit()
 

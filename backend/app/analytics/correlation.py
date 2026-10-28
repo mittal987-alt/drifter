@@ -18,6 +18,7 @@ SOURCE_META = {
 
 
 from app.reports.utils import parse_ts
+_parse_ts = parse_ts
 
 
 def analyze_cross_platform_correlation(
@@ -57,7 +58,7 @@ def analyze_cross_platform_correlation(
     for src in ALL_SOURCES:
         ctr: Counter = Counter()
         for e in by_source.get(src, []):
-            ts = _parse_ts(e.get("timestamp"))
+            ts = parse_ts(e.get("timestamp"))
             if ts:
                 ctr[ts.hour] += 1
         source_hours[src] = ctr

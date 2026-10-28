@@ -104,6 +104,16 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    extension_tokens = relationship(
+        "ExtensionToken",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    extension_auth_sessions = relationship(
+        "ExtensionAuthSession",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
 
 # =========================================================
@@ -377,3 +387,159 @@ class PortabilityExportJob(Base):
     )
 
     user = relationship("User", back_populates="export_jobs")
+
+
+# =========================================================
+# EXTENSION TOKEN (Revocable Extension Client Auth)
+# =========================================================
+
+class ExtensionToken(Base):
+    __tablename__ = "extension_tokens"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    token_hash = Column(
+        String(64),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+
+    token_prefix = Column(
+        String(16),
+        nullable=False,
+    )
+
+    client_name = Column(
+        String(100),
+        nullable=False,
+        default="Chrome Extension",
+    )
+
+    permissions = Column(
+        Text,
+        nullable=False,
+        default='["youtube", "spotify", "web"]',
+    )
+
+    is_revoked = Column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+
+    revoked_at = Column(
+        DateTime,
+        nullable=True,
+    )
+
+    last_used_at = Column(
+        DateTime,
+        nullable=True,
+    )
+
+    created_at = Column(
+        DateTime,
+        default=_utcnow,
+    )
+
+    user = relationship("User", back_populates="extension_tokens")
+ 
+ 
+ # =========================================================
+ # EXTENSION AUTH SESSION (Short-lived PKCE Authorization)
+ # =========================================================
+ 
+ class ExtensionAuthSession(Base):
+     __tablename__ = "extension_auth_sessions"
+ 
+     id = Column(
+         Integer,
+         primary_key=True,
+         index=True,
+     )
+ 
+     session_id = Column(
+         String(64),
+         unique=True,
+         nullable=False,
+         index=True,
+     )
+ 
+     user_id = Column(
+         Integer,
+         ForeignKey("users.id", ondelete="CASCADE"),
+         nullable=True,
+         index=True,
+     )
+ 
+     code_challenge = Column(
+         String(128),
+         nullable=False,
+     )
+ 
+     code_challenge_method = Column(
+         String(10),
+         nullable=False,
+         default="S256",
+     )
+ 
+     state = Column(
+         String(128),
+         nullable=False,
+         index=True,
+     )
+ 
+     client_name = Column(
+         String(100),
+         nullable=False,
+         default="Chrome Extension",
+     )
+ 
+     permissions = Column(
+         Text,
+         nullable=False,
+         default='["youtube", "spotify", "web"]',
+     )
+ 
+     auth_code_hash = Column(
+         String(64),
+         unique=True,
+         index=True,
+         nullable=True,
+     )
+ 
+     status = Column(
+         String(32),
+         nullable=False,
+         default="PENDING",
+     )
+ 
+     is_used = Column(
+         Boolean,
+         default=False,
+         nullable=False,
+     )
+ 
+     expires_at = Column(
+         DateTime,
+         nullable=False,
+     )
+ 
+     created_at = Column(
+         DateTime,
+         default=_utcnow,
+     )
+ 
+     user = relationship("User", back_populates="extension_auth_sessions")

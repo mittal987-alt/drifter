@@ -137,6 +137,21 @@ def _ensure_schema() -> None:
                     conn.execute(text(f"ALTER TABLE portability_export_jobs ADD COLUMN {col_name} {col_type}"))
                     conn.commit()
 
+        # ── extension_tokens ──────────────────────────────────
+        if "extension_tokens" in tables:
+            columns = [c["name"] for c in inspector.get_columns("extension_tokens")]
+            for col_name, col_type in [
+                ("token_prefix", "VARCHAR(16)"),
+                ("client_name", "VARCHAR(100) DEFAULT 'Chrome Extension'"),
+                ("permissions", "TEXT"),
+                ("is_revoked", "BOOLEAN DEFAULT 0"),
+                ("revoked_at", "DATETIME"),
+                ("last_used_at", "DATETIME"),
+            ]:
+                if col_name not in columns:
+                    conn.execute(text(f"ALTER TABLE extension_tokens ADD COLUMN {col_name} {col_type}"))
+                    conn.commit()
+
 
 # ============================================================
 # LIFESPAN
